@@ -1,34 +1,42 @@
+import { router } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { AuthHeader } from '../../components/auth-header'
 import { AuthScreenLayout } from '../../components/auth-screen-layout'
 import { PrimaryButton } from '../../components/primary-button'
 import { TextInputField } from '../../components/text-input-field'
+import { supabase } from '../../lib/supabase'
 
-interface LoginScreenProps {
-    onLogin?: () => void
-    onForgotPassword?: () => void
-    onJoinSchool?: () => void
-    onBack?: () => void
-}
 
-export default function LoginScreen({
-    onLogin,
-    onForgotPassword,
-    onJoinSchool,
-    onBack,
-}: LoginScreenProps) {
+
+
+export default function LoginScreen() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+
+    async function handleLogin() {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        })
+
+        if (error) {
+            Alert.alert('Błąd logowania', error.message)
+            return
+        }
+
+        router.replace('/home')
+    }
+
 
     return (
         <AuthScreenLayout showWave waveVariant="small">
             {/* Back arrow */}
             <View className="px-5 pt-12 pb-0">
                 <Pressable
-                    onPress={onBack}
-                    accessibilityRole="button"
+/*                     onPress={onBack}
+ */                    accessibilityRole="button"
                     accessibilityLabel="Wróć"
                     className="flex-row items-center gap-1.5"
                 >
@@ -79,7 +87,7 @@ export default function LoginScreen({
                     {/* Forgot password */}
                     <View className="items-end">
                         <Pressable
-                            onPress={onForgotPassword}
+                            /*  onPress={onForgotPassword} */
                             accessibilityRole="button"
                         >
                             <Text className="text-xs text-[#78A4CB] font-medium">
@@ -92,7 +100,7 @@ export default function LoginScreen({
                 {/* Primary CTA */}
                 <PrimaryButton
                     label="Zaloguj się"
-                    onPress={onLogin}
+                    onPress={() => handleLogin()}
                     variant="primary"
                     className="mb-6"
                 />
@@ -113,7 +121,7 @@ export default function LoginScreen({
                     </Text>
 
                     <Pressable
-                        onPress={onJoinSchool}
+                        onPress={() => router.push("/(auth)/register")}
                         accessibilityRole="button"
                     >
                         <Text className="text-sm  text-[#78A4CB]">
