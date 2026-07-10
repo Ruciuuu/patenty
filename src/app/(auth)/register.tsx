@@ -22,21 +22,25 @@ export default function RegisterScreen() {
         }
 
 
-        const { error } = await supabase.auth.signUp({
+        const { error, data } = await supabase.auth.signUp({
             email,
             password
         })
+
+        if (data && error === null) {
+            Alert.alert(`Email weryfikacyjny został przesłany na adres`)
+        }
     }
 
     return (
         <AuthScreenLayout showWave waveVariant="small">
-            <View>
+            <View className="w-fulle h-screen">
                 <View className="px-5 pt-12">
                     <Pressable
                         onPress={() => router.back()}
                         accessibilityRole="button"
                         accessibilityLabel="Wróć"
-                        className="flex-row items-center gap-1.5"
+                        className="flex-row items-center gap-1.5 mt-5"
                     >
                         <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                             <Path

@@ -16,7 +16,7 @@ export function PrimaryButton({
     className = '',
 }: PrimaryButtonProps) {
     const base =
-        'items-center justify-center rounded-3xl active:scale-95'
+        'items-center justify-center rounded-3xl active:scale-95 w-[75%] mx-auto'
 
     const buttonVariants = {
         primary: 'bg-[#78A4CB] py-4 px-8 shadow-md',

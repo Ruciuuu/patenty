@@ -38,7 +38,7 @@ export default function LoginScreen() {
 /*                     onPress={onBack}
  */                    accessibilityRole="button"
                     accessibilityLabel="Wróć"
-                    className="flex-row items-center gap-1.5"
+                    className="flex-row items-center gap-1.5 mt-5"
                 >
                     <Svg
                         width={18}
