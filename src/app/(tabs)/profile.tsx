@@ -1,5 +1,11 @@
-import React from 'react'
-import { View, Text, Pressable, ScrollView } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import {
+    View,
+    Text,
+    Pressable,
+    ScrollView,
+    Alert,
+} from 'react-native'
 import {
     User,
     Mail,
@@ -9,22 +15,64 @@ import {
     Settings,
     LogOut,
     ChevronRight,
-    Sailboat,
     Anchor,
-    BookOpen,
-    Trophy,
     Star,
-    Home,
-    TrendingUp,
 } from 'lucide-react-native'
+
 import { useAuth } from '@/context/auth-context'
-import { supabase } from '@/lib/supabase'
-import { BottomNav } from '@/components/bottom-nav'
+import { BottomNav } from '@/components/app/bottom-nav'
 import { signOut } from '@/lib/session'
-import { Alert } from 'react-native'
+import { getUserSchoolName } from '@/services/school.service'
 
 export default function AccountScreen() {
     const { user } = useAuth()
+
+    const [schoolName, setSchoolName] = useState<string | null>(null)
+    const [isSchoolLoading, setIsSchoolLoading] = useState(true)
+
+    useEffect(() => {
+        let isMounted = true
+
+        async function fetchSchoolName() {
+            if (!user?.id) {
+                if (isMounted) {
+                    setSchoolName(null)
+                    setIsSchoolLoading(false)
+                }
+
+                return
+            }
+
+            try {
+                setIsSchoolLoading(true)
+
+                const name = await getUserSchoolName(user.id)
+
+                if (isMounted) {
+                    setSchoolName(name)
+                }
+            } catch (error) {
+                console.error(
+                    'Błąd podczas pobierania szkoły użytkownika:',
+                    error
+                )
+
+                if (isMounted) {
+                    setSchoolName(null)
+                }
+            } finally {
+                if (isMounted) {
+                    setIsSchoolLoading(false)
+                }
+            }
+        }
+
+        fetchSchoolName()
+
+        return () => {
+            isMounted = false
+        }
+    }, [user?.id])
 
     const userName =
         user?.user_metadata?.first_name ??
@@ -33,10 +81,24 @@ export default function AccountScreen() {
 
     const email = user?.email ?? 'Brak adresu e-mail'
 
+    const displayedSchoolName = isSchoolLoading
+        ? 'Ładowanie...'
+        : schoolName ?? 'Nie przypisano'
+
     async function handleLogout() {
-        const logout = await signOut()
-        if (logout) {
-            Alert.alert("Zostałeś wylogowany")
+        try {
+            const logout = await signOut()
+
+            if (logout) {
+                Alert.alert('Zostałeś wylogowany')
+            }
+        } catch (error) {
+            console.error('Błąd podczas wylogowywania:', error)
+
+            Alert.alert(
+                'Błąd',
+                'Nie udało się wylogować. Spróbuj ponownie.'
+            )
         }
     }
 
@@ -50,13 +112,10 @@ export default function AccountScreen() {
                 <View className="px-6 pt-14">
                     <View className="mb-7 flex-row items-center justify-between">
                         <View>
-
                             <Text className="text-4xl font-extrabold leading-tight text-[#1A3A52]">
                                 Twój profil
                             </Text>
                         </View>
-
-
                     </View>
 
                     <View className="mb-8 overflow-hidden rounded-[28px] bg-[#D9EEF7] p-6 shadow-sm">
@@ -68,33 +127,12 @@ export default function AccountScreen() {
                             </View>
 
                             <View className="flex-1">
-
                                 <Text className="mt-1 text-base text-[#5A7A95]">
                                     {email}
                                 </Text>
                             </View>
                         </View>
-
-
                     </View>
-
-                    {/* <View className="mb-7 flex-row gap-4">
-                        <ProfileStatCard
-                            label="Lekcje"
-                            value="24"
-                            icon={<BookOpen />}
-                        />
-                        <ProfileStatCard
-                            label="Postęp"
-                            value="65%"
-                            icon={<TrendingUp />}
-                        />
-                        <ProfileStatCard
-                            label="Odznaki"
-                            value="6"
-                            icon={<Trophy />}
-                        />
-                    </View> */}
 
                     <View className="mb-7 rounded-[28px] bg-white p-5 shadow-sm">
                         <Text className="mb-4 text-xl font-extrabold text-[#1A3A52]">
@@ -116,7 +154,7 @@ export default function AccountScreen() {
                         <AccountRow
                             icon={<School />}
                             title="Szkoła żeglarska"
-                            value="Nie przypisano"
+                            value={displayedSchoolName}
                         />
 
                         <AccountRow
@@ -132,22 +170,41 @@ export default function AccountScreen() {
                             Ustawienia
                         </Text>
 
-                        <SettingsRow icon={<Bell />} title="Powiadomienia" />
-                        <SettingsRow icon={<Star />} title="Ulubione pytania" />
-                        <SettingsRow icon={<Anchor />} title="Moje patenty" />
-                        <SettingsRow icon={<Settings />} title="Ustawienia aplikacji" last />
+                        <SettingsRow
+                            icon={<Bell />}
+                            title="Powiadomienia"
+                        />
+
+                        <SettingsRow
+                            icon={<Star />}
+                            title="Ulubione pytania"
+                        />
+
+                        <SettingsRow
+                            icon={<Anchor />}
+                            title="Moje patenty"
+                        />
+
+                        <SettingsRow
+                            icon={<Settings />}
+                            title="Ustawienia aplikacji"
+                            last
+                        />
                     </View>
 
                     <Pressable
                         onPress={handleLogout}
                         className="mb-6 flex-row items-center justify-center gap-2 rounded-[24px] bg-white px-5 py-5 shadow-sm"
                     >
-                        <LogOut size={22} color="#EF4444" strokeWidth={2.4} />
-                        <Pressable onPress={() => handleLogout()}>
-                            <Text className="text-lg font-bold text-[#EF4444]">
-                                Wyloguj się
-                            </Text>
-                        </Pressable>
+                        <LogOut
+                            size={22}
+                            color="#EF4444"
+                            strokeWidth={2.4}
+                        />
+
+                        <Text className="text-lg font-bold text-[#EF4444]">
+                            Wyloguj się
+                        </Text>
                     </Pressable>
                 </View>
             </ScrollView>
@@ -179,6 +236,7 @@ function ProfileStatCard({
             <Text className="text-2xl font-extrabold text-[#1A3A52]">
                 {value}
             </Text>
+
             <Text className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#9AA8B0]">
                 {label}
             </Text>
@@ -199,8 +257,8 @@ function AccountRow({
 }) {
     return (
         <View
-            className={`flex-row items-center gap-4 py-4 ${last ? '' : 'border-b border-[#E6EEF2]'
-                }`}
+            className={`flex - row items - center gap - 4 py - 4 ${last ? '' : 'border-b border-[#E6EEF2]'
+                } `}
         >
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#D9EEF7]">
                 {React.cloneElement(icon, {
@@ -214,6 +272,7 @@ function AccountRow({
                 <Text className="text-sm font-semibold text-[#7B91A3]">
                     {title}
                 </Text>
+
                 <Text className="mt-0.5 text-base font-bold text-[#1A3A52]">
                     {value}
                 </Text>
@@ -233,8 +292,8 @@ function SettingsRow({
 }) {
     return (
         <Pressable
-            className={`flex-row items-center gap-4 py-4 ${last ? '' : 'border-b border-[#E6EEF2]'
-                }`}
+            className={`flex - row items - center gap - 4 py - 4 ${last ? '' : 'border-b border-[#E6EEF2]'
+                } `}
         >
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#D9EEF7]">
                 {React.cloneElement(icon, {
@@ -248,49 +307,12 @@ function SettingsRow({
                 {title}
             </Text>
 
-            <ChevronRight size={22} color="#9AA8B0" strokeWidth={2.4} />
+            <ChevronRight
+                size={22}
+                color="#9AA8B0"
+                strokeWidth={2.4}
+            />
         </Pressable>
     )
 }
-/* 
-function BottomNav() {
-    return (
-        <View className="absolute bottom-5 left-5 right-5 rounded-[28px] bg-white px-5 py-4 shadow-md">
-            <View className="flex-row items-center justify-between">
-                <NavItem label="Home" icon={<Home />} />
-                <NavItem label="Kursy" icon={<BookOpen />} />
-                <NavItem label="Postępy" icon={<TrendingUp />} />
-                <NavItem label="Ulubione" icon={<Star />} />
-                <NavItem active label="Profil" icon={<User />} />
-            </View>
-        </View>
-    )
-}
- */
-/* function NavItem({
-    icon,
-    label,
-    active = false,
-}: {
-    icon: React.ReactElement
-    label: string
-    active?: boolean
-}) {
-    return (
-        <Pressable className="items-center gap-1">
-            {React.cloneElement(icon, {
-                size: 25,
-                color: active ? '#3478D9' : '#9AA8B0',
-                strokeWidth: 2.6,
-                fill: active && label === 'Profil' ? '#3478D9' : 'none',
-            })}
 
-            <Text
-                className={`text-xs font-semibold ${active ? 'text-[#3478D9]' : 'text-[#9AA8B0]'
-                    }`}
-            >
-                {label}
-            </Text>
-        </Pressable>
-    )
-} */
