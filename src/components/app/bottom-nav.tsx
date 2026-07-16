@@ -1,8 +1,9 @@
 import { Href, router, useRouter } from 'expo-router'
-import { BookOpen, Home, Star, TrendingUp, User } from 'lucide-react-native'
+import { BookOpen, Home, Star, TrendingUp, User, Sheet } from 'lucide-react-native'
 import React from 'react'
 import { Pressable, View, Text } from 'react-native'
 import { usePathname } from 'expo-router'
+import { NavItemProps } from '@/types/nav'
 
 export function BottomNav() {
     const path = usePathname()
@@ -25,17 +26,17 @@ export function BottomNav() {
                 />
 
                 <NavItem
-                    active={path === "/progress"}
-                    label="Postępy"
-                    icon={<TrendingUp />}
-                    dest="/progress"
+                    active={path === "/exams"}
+                    label="Egzaminy"
+                    icon={<Sheet />}
+                    dest="/exams"
                 />
 
                 <NavItem
-                    active={path === "/favorites"}
-                    label="Ulubione"
-                    icon={<Star />}
-                    dest="/favorites"
+                    active={path === "/progress"}
+                    label="Postęp"
+                    icon={<TrendingUp />}
+                    dest="/progress"
                 />
 
                 <NavItem
@@ -55,12 +56,7 @@ function NavItem({
     label,
     active = false,
     dest,
-}: {
-    icon: React.ReactElement
-    label: string
-    active?: boolean
-    dest: Href
-}) {
+}: NavItemProps) {
     return (
         <Pressable className="items-center gap-1" onPress={() => router.push(dest)}>
             {React.cloneElement(icon, {

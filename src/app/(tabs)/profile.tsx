@@ -1,34 +1,39 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-    View,
-    Text,
+    ActivityIndicator,
+    Alert,
     Pressable,
     ScrollView,
-    Alert,
+    Text,
+    View,
 } from 'react-native'
 import {
-    User,
+    ChevronRight,
+    LogOut,
     Mail,
     School,
     ShieldCheck,
-    Bell,
-    Settings,
-    LogOut,
-    ChevronRight,
-    Anchor,
-    Star,
+    User,
 } from 'lucide-react-native'
 
 import { useAuth } from '@/context/auth-context'
 import { BottomNav } from '@/components/app/bottom-nav'
 import { signOut } from '@/lib/session'
 import { getUserSchoolName } from '@/services/school.service'
+import { useRouter } from 'expo-router'
+import { ProfileWave } from '@/components/ui/waves'
+import { AccountDataCard } from '@/components/profile/account-data-card'
+
 
 export default function AccountScreen() {
     const { user } = useAuth()
 
     const [schoolName, setSchoolName] = useState<string | null>(null)
     const [isSchoolLoading, setIsSchoolLoading] = useState(true)
+    const [isSigningOut, setIsSigningOut] = useState(false);
+
+    const router = useRouter();
+
 
     useEffect(() => {
         let isMounted = true
@@ -54,7 +59,7 @@ export default function AccountScreen() {
             } catch (error) {
                 console.error(
                     'Błąd podczas pobierania szkoły użytkownika:',
-                    error
+                    error,
                 )
 
                 if (isMounted) {
@@ -67,144 +72,282 @@ export default function AccountScreen() {
             }
         }
 
-        fetchSchoolName()
+        void fetchSchoolName()
 
         return () => {
             isMounted = false
         }
     }, [user?.id])
 
-    const userName =
-        user?.user_metadata?.first_name ??
+    const firstName =
+        user?.user_metadata?.first_name?.trim() ??
         user?.email?.split('@')[0] ??
         'Kapitan'
 
+    const lastName =
+        user?.user_metadata?.last_name?.trim() ?? ''
+
+    const userName = `${firstName} ${lastName}`.trim()
     const email = user?.email ?? 'Brak adresu e-mail'
 
     const displayedSchoolName = isSchoolLoading
-        ? 'Ładowanie...'
-        : schoolName ?? 'Nie przypisano'
+        ? 'Pobieranie danych...'
+        : schoolName ?? 'Nie przypisano szkoły'
 
-    async function handleLogout() {
+    const initials =
+        `${firstName.charAt(0)}${lastName.charAt(0)}`
+            .trim()
+            .toUpperCase() ||
+        userName.charAt(0).toUpperCase()
+
+    async function handleSignOut() {
+        if (isSigningOut) {
+            return;
+        }
+
         try {
-            const logout = await signOut()
+            setIsSigningOut(true);
 
-            if (logout) {
-                Alert.alert('Zostałeś wylogowany')
-            }
+            await signOut();
+
+            router.replace('/login');
         } catch (error) {
-            console.error('Błąd podczas wylogowywania:', error)
+            console.error('Sign out error:', error);
 
             Alert.alert(
-                'Błąd',
-                'Nie udało się wylogować. Spróbuj ponownie.'
-            )
+                'Błąd wylogowania',
+                'Nie udało się wylogować. Spróbuj ponownie.',
+            );
+        } finally {
+            setIsSigningOut(false);
         }
     }
 
     return (
-        <View className="flex-1 bg-[#F0F7FA]">
+        <View className="flex-1 bg-[#DDEFF6]">
+
+
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: 130 }}
+                contentContainerStyle={{
+                    paddingBottom: 140,
+                }}
                 showsVerticalScrollIndicator={false}
             >
-                <View className="px-6 pt-14">
-                    <View className="mb-7 flex-row items-center justify-between">
+                <View className="px-5 pt-14">
+                    {/* Nagłówek */}
+                    <View className="mb-6 flex-row items-center justify-between">
                         <View>
-                            <Text className="text-4xl font-extrabold leading-tight text-[#1A3A52]">
-                                Twój profil
+                            <Text className="text-xs font-bold uppercase tracking-[2px] text-[#3478D9]">
+                                Konto ucznia
+                            </Text>
+
+                            <Text className="mt-2 text-4xl font-extrabold leading-tight text-[#163A59]">
+                                Twój Profil
                             </Text>
                         </View>
+
+
                     </View>
 
-                    <View className="mb-8 overflow-hidden rounded-[28px] bg-[#D9EEF7] p-6 shadow-sm">
-                        <View className="flex-row items-center gap-4">
-                            <View className="h-20 w-20 items-center justify-center rounded-full bg-white shadow-sm">
-                                <Text className="text-3xl font-extrabold text-[#3478D9]">
-                                    {userName.charAt(0).toUpperCase()}
-                                </Text>
+                    {/* Hero profilu */}
+                    <View className="mb-6 min-h-[260px] overflow-hidden rounded-[34px] bg-[#163A59] p-6 shadow-lg">
+                        <ProfileWave />
+
+
+
+                        <View className="z-10 flex-1 justify-between">
+                            <View className="flex-row items-start justify-between">
+                                <View className="h-24 w-24 items-center justify-center rounded-[30px] border border-white/20 bg-white/15">
+                                    <Text className="text-4xl font-extrabold text-white">
+                                        {initials}
+                                    </Text>
+                                </View>
+
+                                <View className="flex-row items-center rounded-full bg-[#BFE7CE] px-4 py-2">
+                                    <ShieldCheck
+                                        size={16}
+                                        color="#356B46"
+                                        strokeWidth={2.5}
+                                    />
+
+                                    <Text className="ml-2 text-xs font-bold text-[#356B46]">
+                                        Konto aktywne
+                                    </Text>
+                                </View>
                             </View>
 
-                            <View className="flex-1">
-                                <Text className="mt-1 text-base text-[#5A7A95]">
-                                    {email}
+                            <View className="mt-7">
+                                <Text className="text-xs font-bold uppercase tracking-widest text-white/60">
+                                    Witaj na pokładzie
                                 </Text>
+
+                                <Text className="mt-2 text-3xl font-extrabold text-white">
+                                    {userName}
+                                </Text>
+
+                                <View className="mt-3 flex-row items-center">
+                                    <Mail
+                                        size={17}
+                                        color="#B4DCE8"
+                                        strokeWidth={2.2}
+                                    />
+
+                                    <Text
+                                        className="ml-2 flex-1 text-base text-white/75"
+                                        numberOfLines={1}
+                                    >
+                                        {email}
+                                    </Text>
+                                </View>
+                                <View className="ml-4 flex-1 mt-5">
+                                    <Text className="text-xs font-bold uppercase tracking-widest text-white/65">
+                                        Szkoła żeglarska
+                                    </Text>
+
+                                    <Text className="mt-1 text-xl font-extrabold leading-tight text-white">
+                                        {displayedSchoolName}
+                                    </Text>
+                                </View>
                             </View>
                         </View>
                     </View>
 
-                    <View className="mb-7 rounded-[28px] bg-white p-5 shadow-sm">
-                        <Text className="mb-4 text-xl font-extrabold text-[#1A3A52]">
-                            Dane konta
-                        </Text>
+                    {/* Dane konta */}
+                    <View className="mb-5 overflow-hidden rounded-[30px] p-5">
+                        <View className="mb-4 flex-row items-center justify-between">
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-widest text-[#3478D9]">
+                                    Informacje
+                                </Text>
 
-                        <AccountRow
-                            icon={<User />}
-                            title="Nazwa użytkownika"
-                            value={userName}
-                        />
+                                <Text className="mt-1 text-2xl font-extrabold text-[#163A59]">
+                                    Dane konta
+                                </Text>
+                            </View>
 
-                        <AccountRow
-                            icon={<Mail />}
-                            title="Adres e-mail"
-                            value={email}
-                        />
 
-                        <AccountRow
-                            icon={<School />}
-                            title="Szkoła żeglarska"
-                            value={displayedSchoolName}
-                        />
+                        </View>
 
-                        <AccountRow
-                            icon={<ShieldCheck />}
-                            title="Status konta"
-                            value="Aktywne do ..."
-                            last
-                        />
+                        <View className="gap-3">
+                            <AccountDataCard
+                                icon={<User />}
+                                title="Nazwa użytkownika"
+                                value={userName}
+                            />
+
+                            <AccountDataCard
+                                icon={<Mail />}
+                                title="Adres e-mail"
+                                value={email}
+                            />
+
+                            <AccountDataCard
+                                icon={<School />}
+                                title="Szkoła"
+                                value={displayedSchoolName}
+                                isLoading={isSchoolLoading}
+                            />
+
+                            <AccountDataCard
+                                icon={<ShieldCheck />}
+                                title="Status dostępu"
+                                value="Aktywny"
+                                accent="green"
+                            />
+                        </View>
                     </View>
 
-                    <View className="mb-7 rounded-[28px] bg-white p-5 shadow-sm">
-                        <Text className="mb-4 text-xl font-extrabold text-[#1A3A52]">
-                            Ustawienia
-                        </Text>
+                    {/* Ustawienia */}
+                    {/*    <View className="mb-5 overflow-hidden rounded-[30px] bg-[#F9E8A2] p-5">
+                        <SmallWave color="#F1D567" />
 
-                        <SettingsRow
-                            icon={<Bell />}
-                            title="Powiadomienia"
-                        />
+                        <View className="mb-4 flex-row items-center justify-between">
+                            <View>
+                                <Text className="text-xs font-bold uppercase tracking-widest text-[#8C731D]">
+                                    Personalizacja
+                                </Text>
 
-                        <SettingsRow
-                            icon={<Star />}
-                            title="Ulubione pytania"
-                        />
+                                <Text className="mt-1 text-2xl font-extrabold text-[#163A59]">
+                                    Ustawienia
+                                </Text>
+                            </View>
 
-                        <SettingsRow
-                            icon={<Anchor />}
-                            title="Moje patenty"
-                        />
+                            <Settings
+                                size={28}
+                                color="#79641C"
+                                strokeWidth={2}
+                            />
+                        </View>
 
-                        <SettingsRow
-                            icon={<Settings />}
-                            title="Ustawienia aplikacji"
-                            last
-                        />
+                        <View className="overflow-hidden rounded-[24px] bg-white/50">
+                            <SettingsRow
+                                icon={<Bell />}
+                                title="Powiadomienia"
+                                subtitle="Przypomnienia o nauce"
+                            />
+
+                            <SettingsRow
+                                icon={<Star />}
+                                title="Ulubione pytania"
+                                subtitle="Zapisane materiały"
+                            />
+
+                            <SettingsRow
+                                icon={<Anchor />}
+                                title="Moje patenty"
+                                subtitle="Uprawnienia i certyfikaty"
+                            />
+
+                            <SettingsRow
+                                icon={<Settings />}
+                                title="Ustawienia aplikacji"
+                                subtitle="Wygląd i preferencje"
+                                last
+                            />
+                        </View>
                     </View>
-
+ */}
+                    {/* Wylogowanie */}
                     <Pressable
-                        onPress={handleLogout}
-                        className="mb-6 flex-row items-center justify-center gap-2 rounded-[24px] bg-white px-5 py-5 shadow-sm"
+                        onPress={handleSignOut}
+                        disabled={isSigningOut}
+                        className={`mb-6 flex-row items-center justify-between overflow-hidden rounded-[28px] px-5 py-5 ${isSigningOut
+                            ? 'bg-[#E5B9B9]'
+                            : 'bg-[#F3CACA]'
+                            }`}
                     >
-                        <LogOut
-                            size={22}
-                            color="#EF4444"
-                            strokeWidth={2.4}
-                        />
+                        <View className="flex-row items-center">
+                            <View className="h-12 w-12 items-center justify-center rounded-[18px] bg-white/55">
+                                {isSigningOut ? (
+                                    <ActivityIndicator color="#C84848" />
+                                ) : (
+                                    <LogOut
+                                        size={23}
+                                        color="#C84848"
+                                        strokeWidth={2.4}
+                                    />
+                                )}
+                            </View>
 
-                        <Text className="text-lg font-bold text-[#EF4444]">
-                            Wyloguj się
-                        </Text>
+                            <View className="ml-4">
+                                <Text className="text-lg font-extrabold text-[#A83737]">
+                                    {isSigningOut
+                                        ? 'Wylogowywanie...'
+                                        : 'Wyloguj się'}
+                                </Text>
+
+                                <Text className="mt-1 text-sm text-[#A85C5C]">
+                                    Zakończ bieżącą sesję
+                                </Text>
+                            </View>
+                        </View>
+
+                        <ChevronRight
+                            size={23}
+                            color="#C84848"
+                            strokeWidth={2.3}
+                        />
                     </Pressable>
                 </View>
             </ScrollView>
@@ -214,105 +357,4 @@ export default function AccountScreen() {
     )
 }
 
-function ProfileStatCard({
-    label,
-    value,
-    icon,
-}: {
-    label: string
-    value: string
-    icon: React.ReactElement
-}) {
-    return (
-        <View className="flex-1 rounded-[24px] bg-white p-4 shadow-sm">
-            <View className="mb-3 h-10 w-10 items-center justify-center rounded-2xl bg-[#D9EEF7]">
-                {React.cloneElement(icon, {
-                    size: 21,
-                    color: '#3478D9',
-                    strokeWidth: 2.4,
-                })}
-            </View>
-
-            <Text className="text-2xl font-extrabold text-[#1A3A52]">
-                {value}
-            </Text>
-
-            <Text className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#9AA8B0]">
-                {label}
-            </Text>
-        </View>
-    )
-}
-
-function AccountRow({
-    icon,
-    title,
-    value,
-    last = false,
-}: {
-    icon: React.ReactElement
-    title: string
-    value: string
-    last?: boolean
-}) {
-    return (
-        <View
-            className={`flex - row items - center gap - 4 py - 4 ${last ? '' : 'border-b border-[#E6EEF2]'
-                } `}
-        >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#D9EEF7]">
-                {React.cloneElement(icon, {
-                    size: 22,
-                    color: '#3478D9',
-                    strokeWidth: 2.4,
-                })}
-            </View>
-
-            <View className="flex-1">
-                <Text className="text-sm font-semibold text-[#7B91A3]">
-                    {title}
-                </Text>
-
-                <Text className="mt-0.5 text-base font-bold text-[#1A3A52]">
-                    {value}
-                </Text>
-            </View>
-        </View>
-    )
-}
-
-function SettingsRow({
-    icon,
-    title,
-    last = false,
-}: {
-    icon: React.ReactElement
-    title: string
-    last?: boolean
-}) {
-    return (
-        <Pressable
-            className={`flex - row items - center gap - 4 py - 4 ${last ? '' : 'border-b border-[#E6EEF2]'
-                } `}
-        >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#D9EEF7]">
-                {React.cloneElement(icon, {
-                    size: 22,
-                    color: '#3478D9',
-                    strokeWidth: 2.4,
-                })}
-            </View>
-
-            <Text className="flex-1 text-base font-bold text-[#1A3A52]">
-                {title}
-            </Text>
-
-            <ChevronRight
-                size={22}
-                color="#9AA8B0"
-                strokeWidth={2.4}
-            />
-        </Pressable>
-    )
-}
 

@@ -1,5 +1,0 @@
-Colors: 
-#F9E8A2
-#B4E1EB
-#95BDD7
-#78A4CB

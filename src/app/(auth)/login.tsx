@@ -6,7 +6,7 @@ import { AuthHeader } from '../../components/auth-header'
 import { AuthScreenLayout } from '../../components/auth-screen-layout'
 import { PrimaryButton } from '../../components/primary-button'
 import { TextInputField } from '../../components/text-input-field'
-import { supabase } from '../../lib/supabase'
+import { signInWithEmail } from '@/services/auth.service'
 
 
 
@@ -14,29 +14,49 @@ import { supabase } from '../../lib/supabase'
 export default function LoginScreen() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [isLoading, setIsLoading] = useState(false)
+
 
     async function handleLogin() {
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
-
-        if (error) {
-            Alert.alert('Błąd logowania', error.message)
-            return
+        if (isLoading) {
+            return;
         }
 
-        router.replace('/home')
-    }
+        if (!email.trim() || !password) {
+            Alert.alert(
+                'Brak danych',
+                'Podaj adres e-mail i hasło.',
+            );
+            return;
+        }
 
+        try {
+            setIsLoading(true);
+
+            await signInWithEmail({
+                email,
+                password,
+            });
+
+            router.replace('/home');
+        } catch (error) {
+            console.error('Login error:', error);
+
+            Alert.alert(
+                'Błąd logowania',
+                'Nieprawidłowy adres e-mail lub hasło.',
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     return (
         <AuthScreenLayout showWave waveVariant="small">
             {/* Back arrow */}
             <View className="px-5 pt-12 pb-0">
                 <Pressable
-/*                     onPress={onBack}
- */                    accessibilityRole="button"
+                    accessibilityRole="button"
                     accessibilityLabel="Wróć"
                     className="flex-row items-center gap-1.5 mt-5"
                 >

@@ -8,6 +8,9 @@ type MembershipWithSchool = {
     school: SchoolRelation | null
 }
 
+
+/* Pobieranie nazwy szkoły */
+
 export async function getUserSchoolName(
     userId: string
 ): Promise<string | null> {

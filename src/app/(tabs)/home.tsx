@@ -1,224 +1,494 @@
-import React from 'react'
+import { useCallback, useState } from 'react'
 import {
-    View,
-    Text,
+    ActivityIndicator,
+    Image,
     Pressable,
     ScrollView,
-    Image,
+    Text,
+    View,
 } from 'react-native'
+import { useFocusEffect, useRouter } from 'expo-router'
+import Svg, { Path } from 'react-native-svg'
 import {
-    Search,
     BookOpen,
-    ClipboardCheck,
+    CheckCircle2,
     ChevronRight,
+    ClipboardCheck,
     Play,
-    Sailboat,
+    Sparkles,
     Trophy,
-    Clock3,
-    Target,
 } from 'lucide-react-native'
 
-import { useAuth } from '@/context/auth-context'
 import { BottomNav } from '@/components/app/bottom-nav'
+import { useAuth } from '@/context/auth-context'
+import {
+    getCourses,
+    getCourseWithLessons,
+    type CourseWithLessons,
+} from '@/services/courses.service'
+import { getCompletedLessonIds } from '@/services/progress.service'
 
 export default function HomeScreen() {
+    const router = useRouter()
     const { user } = useAuth()
 
+    const [course, setCourse] =
+        useState<CourseWithLessons | null>(null)
+
+    const [completedLessonIds, setCompletedLessonIds] =
+        useState<string[]>([])
+
+    const [isLoadingCourse, setIsLoadingCourse] =
+        useState(true)
+
+    const [courseError, setCourseError] =
+        useState<string | null>(null)
+
     const userName =
-        user?.user_metadata?.first_name ??
-        user?.email?.split('@')[0] ??
+        user?.user_metadata?.first_name?.trim() ||
+        user?.user_metadata?.full_name?.trim() ||
+        user?.email?.split('@')[0] ||
         'Kapitanie'
 
+    const loadCourseData = useCallback(async () => {
+        try {
+            setIsLoadingCourse(true)
+            setCourseError(null)
+
+            const courses = await getCourses()
+            const firstCourse = courses[0]
+
+            if (!firstCourse) {
+                setCourse(null)
+                setCompletedLessonIds([])
+                return
+            }
+
+            const courseData =
+                await getCourseWithLessons(firstCourse.id)
+
+            setCourse(courseData)
+
+            if (!user?.id) {
+                setCompletedLessonIds([])
+                return
+            }
+
+            const lessonIds = courseData.course_lessons.map(
+                (lesson) => lesson.id,
+            )
+
+            const completedIds = await getCompletedLessonIds(
+                user.id,
+                lessonIds,
+            )
+
+            setCompletedLessonIds(completedIds)
+        } catch (error) {
+            console.error(
+                'Nie udało się pobrać danych kursu na ekranie głównym:',
+                error,
+            )
+
+            setCourse(null)
+            setCompletedLessonIds([])
+            setCourseError(
+                'Nie udało się pobrać danych kursu.',
+            )
+        } finally {
+            setIsLoadingCourse(false)
+        }
+    }, [user?.id])
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadCourseData()
+        }, [loadCourseData]),
+    )
+
+    const totalLessons =
+        course?.course_lessons.length ?? 0
+
+    const completedLessons = course
+        ? course.course_lessons.filter((lesson) =>
+            completedLessonIds.includes(lesson.id),
+        ).length
+        : 0
+
+    const progressPercent =
+        totalLessons === 0
+            ? 0
+            : Math.round(
+                (completedLessons / totalLessons) * 100,
+            )
+
+    const nextLesson = course?.course_lessons.find(
+        (lesson) =>
+            !completedLessonIds.includes(lesson.id),
+    )
+
+    const isCourseCompleted =
+        totalLessons > 0 &&
+        completedLessons === totalLessons
+
+    function openCourse() {
+        if (!course) {
+            return
+        }
+
+        router.push({
+            pathname: '/(course)/[courseId]',
+            params: {
+                courseId: course.id,
+            },
+        })
+    }
+
+    function openNextLesson() {
+        if (!nextLesson) {
+            openCourse()
+            return
+        }
+
+        router.push({
+            pathname: '/(course)/lesson/[lessonId]',
+            params: {
+                lessonId: nextLesson.id,
+            },
+        })
+    }
+
     return (
-        <View className="flex-1 bg-[#F0F7FA]">
+        <View className="flex-1 bg-[#DDEFF6]">
+            <OceanBackground />
+
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: 130 }}
+                contentContainerStyle={{
+                    paddingBottom: 140,
+                }}
                 showsVerticalScrollIndicator={false}
             >
-                <View className="px-6 pt-14">
-                    {/* Header */}
-                    <View className="mb-7">
-                        <Text className="mb-2 text-sm font-semibold uppercase tracking-widest text-[#78A4CB]">
-                            Witaj z powrotem
-                        </Text>
+                <View className="px-5 pt-14">
+                    {/* Powitanie */}
+                    <View className="mb-7 flex-row items-start justify-between">
+                        <View className="flex-1 pr-4">
+                            <Text className="text-xs font-bold uppercase tracking-[2px] text-[#3478D9]">
+                                Witaj na pokładzie
+                            </Text>
 
-                        <Text className="text-4xl font-extrabold leading-tight text-[#1A3A52]">
-                            Cześć, {userName}
-                        </Text>
+                            <Text className="mt-2 text-4xl font-extrabold leading-tight text-[#163A59]">
+                                Cześć, {userName}
+                            </Text>
 
-                        <Text className="mt-3 max-w-sm text-base leading-relaxed text-[#5A7A95]">
-                            Kontynuuj przygotowania do patentu sternika motorowodnego.
-                        </Text>
+                            <Text className="mt-3 max-w-sm text-base leading-6 text-[#55748B]">
+                                Kontynuuj naukę lub sprawdź swoją
+                                wiedzę na egzaminie próbnym.
+                            </Text>
+                        </View>
+
+
                     </View>
-
-                    {/* Search */}
-                    <Pressable className="mb-8 flex-row items-center rounded-3xl border border-[#DDEAF0] bg-white px-5 py-4 shadow-sm">
-                        <Search
-                            size={24}
-                            color="#9AA8B0"
-                            strokeWidth={2.2}
-                        />
-
-                        <Text className="ml-4 text-base text-[#9AA8B0]">
-                            Szukaj lekcji lub pytań...
-                        </Text>
-                    </Pressable>
 
                     {/* Hero */}
-                    <View className="mb-8 h-64 flex-row overflow-hidden rounded-[28px] bg-[#D9EEF7]">
-                        <View className="z-10 w-[58%] justify-center px-6">
-                            <Text className="mb-3 text-xs font-bold uppercase tracking-widest text-[#3478D9]">
-                                Sternik motorowodny
+                    <View className="mb-7 h-[330px] overflow-hidden rounded-[34px] bg-[#163A59] shadow-lg">
+                        <Image
+                            source={require('@/assets/images/home-boat.jpg')}
+                            className="absolute h-full w-full"
+                            resizeMode="cover"
+                        />
+
+                        <View className="absolute inset-0 bg-[#102F49]/60" />
+                        <HeroWave />
+
+                        <View className="z-10 flex-1 justify-between p-6">
+                            <View className="flex-row items-center justify-between">
+                                <View className="rounded-full bg-white/15 px-4 py-2">
+                                    <Text className="text-xs font-bold uppercase tracking-widest text-white">
+                                        Sternik motorowodny
+                                    </Text>
+                                </View>
+
+
+                            </View>
+
+                            <View>
+                                {isLoadingCourse ? (
+                                    <View className="items-start">
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#FFFFFF"
+                                        />
+
+                                        <Text className="mt-3 text-sm font-semibold text-white/80">
+                                            Pobieranie kolejnej lekcji...
+                                        </Text>
+                                    </View>
+                                ) : courseError ? (
+                                    <Text className="max-w-[280px] text-2xl font-extrabold leading-tight text-white">
+                                        {courseError}
+                                    </Text>
+                                ) : nextLesson ? (
+                                    <>
+                                        <Text className="text-sm font-semibold text-white/70">
+                                            Kontynuuj naukę
+                                        </Text>
+
+                                        <Text
+                                            className="mt-2 max-w-[300px] text-3xl font-extrabold leading-tight text-white"
+                                            numberOfLines={3}
+                                        >
+                                            {nextLesson.title}
+                                        </Text>
+                                    </>
+                                ) : isCourseCompleted ? (
+                                    <>
+                                        <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-[#B9E49B]">
+                                            <Trophy
+                                                size={25}
+                                                color="#315D28"
+                                            />
+                                        </View>
+
+                                        <Text className="text-3xl font-extrabold text-white">
+                                            Kurs ukończony
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text className="max-w-[280px] text-3xl font-extrabold leading-tight text-white">
+                                        Rozpocznij przygotowania do egzaminu
+                                    </Text>
+                                )}
+
+                                <View className="mt-5 flex-row items-center">
+                                    <View className="mr-4 h-12 w-12 items-center justify-center rounded-full border-4 border-white/40 bg-white/10">
+                                        <Text className="text-xs font-extrabold text-white">
+                                            {progressPercent}%
+                                        </Text>
+                                    </View>
+
+                                    <View className="flex-1">
+                                        <View className="h-2.5 overflow-hidden rounded-full bg-white/20">
+                                            <View
+                                                className="h-full rounded-full bg-[#F9E8A2]"
+                                                style={{
+                                                    width: `${progressPercent}%`,
+                                                }}
+                                            />
+                                        </View>
+
+                                        <Text className="mt-2 text-xs font-medium text-white/70">
+                                            {completedLessons} z {totalLessons}{' '}
+                                            lekcji ukończonych
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Pressable
+                                    onPress={openNextLesson}
+                                    disabled={isLoadingCourse || !course}
+                                    className={`mt-6 flex-row items-center justify-center rounded-[20px] px-5 py-4 ${isLoadingCourse || !course
+                                        ? 'bg-white/20'
+                                        : 'bg-white'
+                                        }`}
+                                >
+                                    <Play
+                                        size={19}
+                                        color={
+                                            isLoadingCourse || !course
+                                                ? '#FFFFFF'
+                                                : '#3478D9'
+                                        }
+                                        fill={
+                                            isLoadingCourse || !course
+                                                ? '#FFFFFF'
+                                                : '#3478D9'
+                                        }
+                                    />
+
+                                    <Text
+                                        className={`ml-3 text-base font-extrabold ${isLoadingCourse || !course
+                                            ? 'text-white'
+                                            : 'text-[#3478D9]'
+                                            }`}
+                                    >
+                                        {nextLesson
+                                            ? 'Kontynuuj lekcję'
+                                            : isCourseCompleted
+                                                ? 'Powtórz kurs'
+                                                : 'Otwórz kurs'}
+                                    </Text>
+
+                                    <ChevronRight
+                                        size={21}
+                                        color={
+                                            isLoadingCourse || !course
+                                                ? '#FFFFFF'
+                                                : '#3478D9'
+                                        }
+                                    />
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Nagłówek sekcji */}
+                    <View className="mb-4 flex-row items-end justify-between">
+                        <View>
+                            <Text className="text-2xl font-extrabold text-[#163A59]">
+                                Wybierz tryb
                             </Text>
 
-                            <Text className="mb-6 text-2xl font-extrabold leading-tight text-[#1A3A52]">
-                                Przygotuj się do egzaminu krok po kroku
+                            <Text className="mt-1 text-sm text-[#647F92]">
+                                Nauka lub sprawdzenie wiedzy
                             </Text>
-
-                            <Pressable className="self-start flex-row items-center rounded-2xl bg-[#3478D9] px-4 py-3">
-                                <Play
-                                    size={18}
-                                    color="white"
-                                    fill="white"
-                                />
-
-                                <Text className="ml-2 text-base font-bold text-white">
-                                    Kontynuuj naukę
-                                </Text>
-                            </Pressable>
                         </View>
 
-                        <View className="absolute bottom-0 right-0 h-full w-[52%]">
-                            <Image
-                                source={require('@/assets/images/home-boat.jpg')}
-                                className="h-full w-full"
-                                resizeMode="cover"
-                            />
 
-                            <View className="absolute inset-0 bg-[#D9EEF7]/10" />
-                        </View>
                     </View>
 
-                    {/* Main options */}
-                    <Text className="mb-4 text-2xl font-extrabold text-[#1A3A52]">
-                        Wybierz tryb nauki
-                    </Text>
+                    {/* Karta kursu */}
+                    <Pressable
+                        onPress={
+                            nextLesson ? openNextLesson : openCourse
+                        }
+                        disabled={isLoadingCourse}
+                        className="mb-4 min-h-[245px] overflow-hidden rounded-[32px] bg-[#3478D9] p-6 shadow-md"
+                    >
+                        <CardWave color="#74A8E2" />
 
-                    <View className="mb-8 gap-4">
-                        <MainFeatureCard
-                            title="Kurs sternika motorowodnego"
-                            subtitle="Lekcje, materiały i powtórki przygotowane zgodnie z zakresem egzaminu."
-                            badge="12 modułów"
-                            progress={42}
-                            icon={
-                                <BookOpen
-                                    size={30}
-                                    color="#3478D9"
-                                    strokeWidth={2.2}
-                                />
-                            }
-                            buttonLabel="Otwórz kurs"
-                            onPress={() => {
-                                // router.push('/course')
-                            }}
-                        />
 
-                        <MainFeatureCard
-                            title="Egzaminy sternika motorowodnego"
-                            subtitle="Rozwiązuj próbne egzaminy i sprawdzaj swoją gotowość."
-                            badge="Egzamin próbny"
-                            progress={68}
-                            accent="cream"
-                            icon={
-                                <ClipboardCheck
-                                    size={30}
-                                    color="#1A3A52"
-                                    strokeWidth={2.2}
-                                />
-                            }
-                            buttonLabel="Rozpocznij egzamin"
-                            onPress={() => {
-                                // router.push('/exams')
-                            }}
-                        />
-                    </View>
+                        <View className="z-10 flex-1 justify-between">
+                            <View className="flex-row items-start justify-between">
+                                <View className="h-14 w-14 items-center justify-center rounded-[20px] bg-white/15">
+                                    <BookOpen
+                                        size={28}
+                                        color="#FFFFFF"
+                                        strokeWidth={2.2}
+                                    />
+                                </View>
 
-                    {/* Quick stats */}
-                    <View className="mb-8 flex-row gap-3">
-                        <StatCard
-                            icon={
-                                <Clock3
-                                    size={22}
-                                    color="#3478D9"
-                                />
-                            }
-                            label="Czas nauki"
-                            value="4h 20m"
-                        />
+                                <View className="rounded-full bg-white/15 px-4 py-2">
+                                    <Text className="text-xs font-bold text-white">
+                                        {progressPercent}% ukończone
+                                    </Text>
+                                </View>
+                            </View>
 
-                        <StatCard
-                            icon={
-                                <Target
-                                    size={22}
-                                    color="#3478D9"
-                                />
-                            }
-                            label="Poprawne"
-                            value="82%"
-                        />
-
-                        <StatCard
-                            icon={
-                                <Trophy
-                                    size={22}
-                                    color="#3478D9"
-                                />
-                            }
-                            label="Seria"
-                            value="6 dni"
-                        />
-                    </View>
-
-                    {/* Resume section */}
-                    <View className="mb-6 rounded-[28px] border border-[#DDEAF0] bg-white p-5 shadow-sm">
-                        <View className="mb-4 flex-row items-start justify-between">
-                            <View className="flex-1 pr-4">
-                                <Text className="text-xs font-bold uppercase tracking-widest text-[#78A4CB]">
-                                    Ostatnia aktywność
+                            <View className="mt-7">
+                                <Text className="text-2xl font-extrabold leading-tight text-white">
+                                    {course?.name ??
+                                        'Kurs sternika motorowodnego'}
                                 </Text>
 
-                                <Text className="mt-2 text-xl font-extrabold leading-tight text-[#1A3A52]">
-                                    Znaki żeglugowe i oznakowanie szlaku
-                                </Text>
-
-                                <Text className="mt-2 text-sm leading-relaxed text-[#5A7A95]">
-                                    Moduł 3 z kursu sternika motorowodnego.
+                                <Text
+                                    className="mt-3 max-w-[290px] text-base leading-6 text-white/80"
+                                    numberOfLines={3}
+                                >
+                                    {course?.description ??
+                                        'Lekcje i materiały przygotowujące do egzaminu.'}
                                 </Text>
                             </View>
 
-                            <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#D9EEF7]">
-                                <Sailboat
-                                    size={25}
-                                    color="#3478D9"
-                                />
+                            <View className="mt-6 flex-row items-center justify-between">
+                                <View className="flex-row items-center">
+                                    <CheckCircle2
+                                        size={18}
+                                        color="#DDF4CA"
+                                    />
+
+                                    <Text className="ml-2 text-sm font-semibold text-white/90">
+                                        {completedLessons}/{totalLessons}{' '}
+                                        lekcji
+                                    </Text>
+                                </View>
+
+                                <View className="h-11 w-11 items-center justify-center rounded-full bg-white">
+                                    <ChevronRight
+                                        size={23}
+                                        color="#3478D9"
+                                    />
+                                </View>
                             </View>
                         </View>
+                    </Pressable>
 
-                        <View className="mb-4 h-3 overflow-hidden rounded-full bg-[#E6EEF2]">
-                            <View className="h-full w-[42%] rounded-full bg-[#3478D9]" />
+                    {/* Karta egzaminów */}
+                    <Pressable
+                        onPress={() => router.push('/exams')}
+                        className="mb-5 min-h-[225px] overflow-hidden rounded-[32px] bg-[#F9E8A2] p-6 shadow-sm"
+                    >
+                        <CardWave color="#F2D66D" />
+
+
+
+                        <View className="z-10 flex-1 justify-between">
+                            <View className="flex-row items-start justify-between">
+                                <View className="h-14 w-14 items-center justify-center rounded-[20px] bg-white/50">
+                                    <ClipboardCheck
+                                        size={29}
+                                        color="#163A59"
+                                        strokeWidth={2.2}
+                                    />
+                                </View>
+
+                                <View className="flex-row items-center rounded-full bg-white/50 px-4 py-2">
+                                    <Sparkles
+                                        size={14}
+                                        color="#7E661E"
+                                    />
+
+                                    <Text className="ml-2 text-xs font-bold text-[#7E661E]">
+                                        Egzamin próbny
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View className="mt-7">
+                                <Text className="text-2xl font-extrabold leading-tight text-[#163A59]">
+                                    Egzaminy sternika motorowodnego
+                                </Text>
+
+                                <Text className="mt-3 max-w-[290px] text-base leading-6 text-[#5F654D]">
+                                    Rozwiązuj pełne zestawy pytań i
+                                    sprawdzaj swoją gotowość.
+                                </Text>
+                            </View>
+
+                            <View className="mt-6 flex-row items-center justify-between">
+                                <Text className="text-sm font-bold text-[#163A59]">
+                                    Rozpocznij egzamin
+                                </Text>
+
+                                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#163A59]">
+                                    <ChevronRight
+                                        size={23}
+                                        color="#FFFFFF"
+                                    />
+                                </View>
+                            </View>
                         </View>
+                    </Pressable>
 
-                        <Pressable className="flex-row items-center justify-between rounded-2xl bg-[#F0F7FA] px-4 py-3">
-                            <Text className="font-bold text-[#3478D9]">
-                                Wznów lekcję
-                            </Text>
+                    {/* Pasek stanu */}
+                    <View className="mb-6 overflow-hidden rounded-[28px] bg-[#B9DFEB] p-5">
 
-                            <ChevronRight
-                                size={20}
-                                color="#3478D9"
-                            />
-                        </Pressable>
+
+                        <View className="z-10 flex-row items-center">
+
+                            <View className="ml-4 flex-rw">
+
+                                <Text className="text-xs font-bold uppercase tracking-widest text-[#3478D9]">
+                                    Twój postęp
+                                </Text>
+
+                                <Text className="mt-1 text-lg font-extrabold text-[#163A59]">
+                                    {totalLessons > 0
+                                        ? `${completedLessons} z ${totalLessons} lekcji ukończonych`
+                                        : 'Rozpocznij swoją pierwszą lekcję'}
+                                </Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
             </ScrollView>
@@ -228,122 +498,83 @@ export default function HomeScreen() {
     )
 }
 
-function MainFeatureCard({
-    title,
-    subtitle,
-    badge,
-    progress,
-    icon,
-    buttonLabel,
-    onPress,
-    accent = 'blue',
-}: {
-    title: string
-    subtitle: string
-    badge: string
-    progress: number
-    icon: React.ReactNode
-    buttonLabel: string
-    onPress?: () => void
-    accent?: 'blue' | 'cream'
-}) {
-    const isBlue = accent === 'blue'
-
+function OceanBackground() {
     return (
-        <View
-            className={`overflow-hidden rounded-[28px] border p-5 shadow-sm ${isBlue
-                ? 'border-[#C9E4EF] bg-white'
-                : 'border-[#F2E3A5] bg-[#FFF9E3]'
-                }`}
-        >
-            <View className="mb-5 flex-row items-start justify-between">
-                <View
-                    className={`h-14 w-14 items-center justify-center rounded-2xl ${isBlue ? 'bg-[#D9EEF7]' : 'bg-[#F9E8A2]'
-                        }`}
+        <View className="absolute inset-0 overflow-hidden">
+            <View className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#B9E0EC]/60" />
+
+            <View className="absolute left-[-90] top-[340px] h-72 w-72 rounded-full bg-[#CEEAF2]/70" />
+
+            <View className="absolute bottom-0 left-0 right-0 h-64">
+                <Svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 400 250"
+                    preserveAspectRatio="none"
                 >
-                    {icon}
-                </View>
-
-                <View
-                    className={`rounded-full px-3 py-1.5 ${isBlue ? 'bg-[#EAF5F9]' : 'bg-white/70'
-                        }`}
-                >
-                    <Text
-                        className={`text-xs font-bold ${isBlue ? 'text-[#3478D9]' : 'text-[#8B721F]'
-                            }`}
-                    >
-                        {badge}
-                    </Text>
-                </View>
-            </View>
-
-            <Text className="text-2xl font-extrabold leading-tight text-[#1A3A52]">
-                {title}
-            </Text>
-
-            <Text className="mt-3 text-base leading-relaxed text-[#5A7A95]">
-                {subtitle}
-            </Text>
-
-            <View className="mt-5">
-                <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-[#7B91A3]">
-                        Postęp
-                    </Text>
-
-                    <Text className="text-sm font-bold text-[#3478D9]">
-                        {progress}%
-                    </Text>
-                </View>
-
-                <View className="h-3 overflow-hidden rounded-full bg-[#E6EEF2]">
-                    <View
-                        style={{ width: `${progress}%` }}
-                        className="h-full rounded-full bg-[#3478D9]"
+                    <Path
+                        d="M0 85 C70 25 135 145 215 80 C285 25 330 105 400 55 L400 250 L0 250 Z"
+                        fill="#B9DFEB"
+                        opacity={0.48}
                     />
-                </View>
+
+                    <Path
+                        d="M0 140 C85 75 145 185 235 120 C305 70 350 135 400 105 L400 250 L0 250 Z"
+                        fill="#78A4CB"
+                        opacity={0.25}
+                    />
+                </Svg>
             </View>
-
-            <Pressable
-                onPress={onPress}
-                className={`mt-5 flex-row items-center justify-between rounded-2xl px-4 py-3 ${isBlue ? 'bg-[#3478D9]' : 'bg-[#1A3A52]'
-                    }`}
-            >
-                <Text className="font-bold text-white">
-                    {buttonLabel}
-                </Text>
-
-                <ChevronRight
-                    size={20}
-                    color="white"
-                />
-            </Pressable>
         </View>
     )
 }
 
-function StatCard({
-    icon,
-    label,
-    value,
+function HeroWave() {
+    return (
+        <View className="absolute bottom-0 left-0 right-0 h-32">
+            <Svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 130"
+                preserveAspectRatio="none"
+            >
+                <Path
+                    d="M0 72 C70 20 130 112 215 65 C292 22 340 92 400 50 L400 130 L0 130 Z"
+                    fill="#3478D9"
+                    opacity={0.25}
+                />
+
+                <Path
+                    d="M0 98 C80 55 145 132 235 92 C310 58 350 105 400 82 L400 130 L0 130 Z"
+                    fill="#163A59"
+                    opacity={0.48}
+                />
+            </Svg>
+        </View>
+    )
+}
+
+function CardWave({
+    color,
 }: {
-    icon: React.ReactNode
-    label: string
-    value: string
+    color: string
 }) {
     return (
-        <View className="flex-1 rounded-[22px] border border-[#DDEAF0] bg-white p-4 shadow-sm">
-            <View className="mb-3 h-10 w-10 items-center justify-center rounded-2xl bg-[#EAF5F9]">
-                {icon}
-            </View>
+        <View className="absolute bottom-0 left-0 right-0 h-24">
+            <Svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 100"
+                preserveAspectRatio="none"
+            >
+                <Path
+                    d="M0 48 C75 4 130 85 220 44 C300 8 345 67 400 40 L400 100 L0 100 Z"
+                    fill={color}
+                    opacity={0.38}
+                />
 
-            <Text className="text-lg font-extrabold text-[#1A3A52]">
-                {value}
-            </Text>
 
-            <Text className="mt-1 text-xs font-medium text-[#7B91A3]">
-                {label}
-            </Text>
+            </Svg>
         </View>
     )
 }
