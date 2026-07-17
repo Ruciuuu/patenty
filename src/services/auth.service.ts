@@ -1,7 +1,7 @@
 // src/features/auth/auth.service.ts
 
 import { supabase } from '@/lib/supabase';
-import type { LoginCredentials } from '@/types/auth';
+import type { LoginCredentials, SignUpCredentials } from '@/types/auth';
 
 export async function signInWithEmail({
     email,
@@ -26,4 +26,31 @@ export async function signOut() {
     if (error) {
         throw error;
     }
+}
+
+
+// Sprawdzam tutaj czy uczeń został zaproszony
+export async function signUpWithEmail({
+    email,
+    password,
+
+}: SignUpCredentials) {
+    const normalizedEmail = email
+        .trim()
+        .toLowerCase()
+
+    const { data, error } =
+        await supabase.auth.signUp({
+            email: normalizedEmail,
+            password,
+            options: {
+                data: {
+                    account_type: 'student',
+                },
+            },
+        })
+
+
+
+    return { data, error }
 }

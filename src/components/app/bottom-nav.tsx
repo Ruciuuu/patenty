@@ -1,9 +1,8 @@
-import { Href, router, useRouter } from 'expo-router'
-import { BookOpen, Home, Star, TrendingUp, User, Sheet } from 'lucide-react-native'
-import React from 'react'
-import { Pressable, View, Text } from 'react-native'
-import { usePathname } from 'expo-router'
 import { NavItemProps } from '@/types/nav'
+import { router, usePathname } from 'expo-router'
+import { BookOpen, Home, Sheet, User } from 'lucide-react-native'
+import React from 'react'
+import { Pressable, Text, View } from 'react-native'
 
 export function BottomNav() {
     const path = usePathname()
@@ -32,13 +31,13 @@ export function BottomNav() {
                     dest="/exams"
                 />
 
-                <NavItem
+                {/*  <NavItem
                     active={path === "/progress"}
                     label="Postęp"
                     icon={<TrendingUp />}
                     dest="/progress"
                 />
-
+ */}
                 <NavItem
                     active={path === "/profile"}
                     label="Profil"

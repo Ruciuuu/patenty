@@ -1,12 +1,12 @@
+import { signUpWithEmail } from "@/services/auth.service"
 import { router } from "expo-router"
 import { useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 import { AuthHeader } from '../../components/auth-header'
 import { AuthScreenLayout } from '../../components/auth-screen-layout'
 import { PrimaryButton } from '../../components/primary-button'
 import { TextInputField } from '../../components/text-input-field'
-import { supabase } from "../../lib/supabase"
 
 
 export default function RegisterScreen() {
@@ -22,13 +22,20 @@ export default function RegisterScreen() {
         }
 
 
-        const { error, data } = await supabase.auth.signUp({
+        const { data, error } = await signUpWithEmail({
             email,
             password
         })
 
-        if (data && error === null) {
+        console.log(data, error)
+
+
+        if (data) {
             Alert.alert(`Email weryfikacyjny został przesłany na adres`)
+
+        }
+        if (error) {
+            Alert.alert(`E-mail nie istnieje w zaproszeniach`)
         }
     }
 
@@ -89,7 +96,8 @@ export default function RegisterScreen() {
                             </Text>
                             <Text className="text-xs leading-relaxed text-[#5A7A95]">
                                 Rejestracja jest dostępna wyłącznie dla uczniów szkół
-                                żeglarskich. Kod szkoły otrzymasz od swojego instruktora.
+                                żeglarskich. Do aplikacji zalogować się możesz jeśli twój
+                                email został dodany do bazy danych.
                             </Text>
                         </View>
                     </View>
@@ -128,28 +136,7 @@ export default function RegisterScreen() {
                             onChange={setSchoolCode}
                         /> */}
 
-                        <View className="mt-1 flex-row items-center gap-1.5">
-                            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                                <Circle
-                                    cx={12}
-                                    cy={12}
-                                    r={10}
-                                    stroke="#9BBCCE"
-                                    strokeWidth={2.2}
-                                />
-                                <Path
-                                    d="M12 16v-4M12 8h.01"
-                                    stroke="#9BBCCE"
-                                    strokeWidth={2.2}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </Svg>
 
-                            <Text className="flex-1 text-xs text-[#9BBCCE]">
-                                Kod szkoły otrzymasz od swojej szkoły żeglarskiej.
-                            </Text>
-                        </View>
                     </View>
                 </View>
 
