@@ -1,18 +1,3 @@
-import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react'
-import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
-} from 'react-native'
 import {
     useLocalSearchParams,
     useRouter,
@@ -29,21 +14,38 @@ import {
     Trophy,
     XCircle,
 } from 'lucide-react-native'
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react'
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
+} from 'react-native'
 
+import { getQuestionImageUrl } from '@/lib/supabase-images'
 import {
     getCourses,
     type Course,
 } from '@/services/courses.service'
 import {
-    getMistakeQuestionsWithAnswers,
-    getQuestionsWithAnswers,
-    type QuestionWithAnswers,
-} from '@/services/questions.service'
-import {
     submitExamAnswers,
     type QuestionAttemptType,
     type SubmittedQuestionResult,
 } from '@/services/question-attempts.service'
+import {
+    getMistakeQuestionsWithAnswers,
+    getQuestionsWithAnswers,
+    type QuestionWithAnswers,
+} from '@/services/questions.service'
+
 
 type ExamMode = 'exam' | 'mistakes'
 
@@ -95,6 +97,8 @@ function shuffleQuestionAnswers(
         ),
     }))
 }
+
+
 
 export default function ExamScreen() {
     const router = useRouter()
@@ -422,6 +426,16 @@ export default function ExamScreen() {
         setCurrentQuestionIndex(0)
         setIsFinished(false)
     }
+
+
+    const questionImageUrl =
+        currentQuestion?.image_url && courseId
+            ? getQuestionImageUrl(
+                courseId,
+                currentQuestion.image_url
+            )
+            : undefined
+
 
     if (isLoading) {
         return (
@@ -871,10 +885,10 @@ export default function ExamScreen() {
                         }
                     </Text>
 
-                    {currentQuestion.image_url && (
+                    {questionImageUrl && (
                         <Image
                             source={{
-                                uri: currentQuestion.image_url,
+                                uri: questionImageUrl,
                             }}
                             className="mt-6 h-52 w-full rounded-2xl bg-[#EAF2F5]"
                             resizeMode="contain"
