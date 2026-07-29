@@ -12,7 +12,7 @@ export type LessonSlide = {
     title: string | null
     content: string
     position: number
-    lesson_slide_images: SlideImage[]
+    image_url: string | null
 }
 
 export async function getSlides(
@@ -26,12 +26,7 @@ export async function getSlides(
             title,
             content,
             position,
-            lesson_slide_images (
-                id,
-                image_url,
-                position
-            )
-        `)
+            image_url `)
         .eq('lesson_id', lessonId)
         .order('position', { ascending: true })
 
@@ -44,8 +39,6 @@ export async function getSlides(
 
     return slides.map((slide) => ({
         ...slide,
-        lesson_slide_images: [
-            ...(slide.lesson_slide_images ?? []),
-        ].sort((a, b) => a.position - b.position),
+
     }))
 }

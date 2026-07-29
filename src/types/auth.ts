@@ -11,4 +11,5 @@ export type SignUpCredentials = {
     password: string
     firstName?: string
     lastName?: string
+    invitationCode: string
 }

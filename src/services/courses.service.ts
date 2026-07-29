@@ -10,12 +10,16 @@ export type Course = {
     description: string | null
     created_at: string
     updated_at: string
+    image_url: string
 }
+
+
+
 
 export async function getCourses(): Promise<Course[]> {
     const { data, error } = await supabase
         .from('courses')
-        .select('id, name, description, created_at, updated_at')
+        .select('id, name, description, created_at, updated_at, image_url')
         .order('created_at', { ascending: true })
 
     if (error) {
@@ -65,6 +69,49 @@ export async function getCourseWithLessons(
 
     if (error) {
         console.error('Błąd pobierania kursu z lekcjami:', error)
+        throw error
+    }
+
+    return data
+}
+
+
+
+export async function getFavoriteCourse(userId: string) {
+
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .select("favorite_course")
+        .eq("id", userId)
+        .single()
+
+    if (error) {
+        console.error('Błąd:', error)
+        throw error
+    }
+
+    return data.favorite_course
+
+
+}
+
+
+export async function setFavoriteCourse(
+    userId: string,
+    courseId: string
+) {
+    const { data, error } = await supabase
+        .from('profiles')
+        .update({
+            favorite_course: courseId
+        })
+        .eq('id', userId)
+        .select()
+        .single()
+
+    if (error) {
+        console.error('Błąd:', error)
         throw error
     }
 

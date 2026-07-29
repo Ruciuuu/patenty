@@ -1,3 +1,12 @@
+import { useRouter } from 'expo-router'
+import {
+    ChevronRight,
+    LogOut,
+    Mail,
+    School,
+    ShieldCheck,
+    User,
+} from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import {
     ActivityIndicator,
@@ -7,33 +16,25 @@ import {
     Text,
     View,
 } from 'react-native'
-import {
-    ChevronRight,
-    LogOut,
-    Mail,
-    School,
-    ShieldCheck,
-    User,
-} from 'lucide-react-native'
 
-import { useAuth } from '@/context/auth-context'
 import { BottomNav } from '@/components/app/bottom-nav'
+import { AccountDataCard } from '@/components/profile/account-data-card'
+import { useAuth } from '@/context/auth-context'
 import { signOut } from '@/lib/session'
 import { getUserSchoolName } from '@/services/school.service'
-import { useRouter } from 'expo-router'
-import { ProfileWave } from '@/components/ui/waves'
-import { AccountDataCard } from '@/components/profile/account-data-card'
-
 
 export default function AccountScreen() {
     const { user } = useAuth()
+    const router = useRouter()
 
-    const [schoolName, setSchoolName] = useState<string | null>(null)
-    const [isSchoolLoading, setIsSchoolLoading] = useState(true)
-    const [isSigningOut, setIsSigningOut] = useState(false);
+    const [schoolName, setSchoolName] =
+        useState<string | null>(null)
 
-    const router = useRouter();
+    const [isSchoolLoading, setIsSchoolLoading] =
+        useState(true)
 
+    const [isSigningOut, setIsSigningOut] =
+        useState(false)
 
     useEffect(() => {
         let isMounted = true
@@ -51,7 +52,8 @@ export default function AccountScreen() {
             try {
                 setIsSchoolLoading(true)
 
-                const name = await getUserSchoolName(user.id)
+                const name =
+                    await getUserSchoolName(user.id)
 
                 if (isMounted) {
                     setSchoolName(name)
@@ -87,12 +89,17 @@ export default function AccountScreen() {
     const lastName =
         user?.user_metadata?.last_name?.trim() ?? ''
 
-    const userName = `${firstName} ${lastName}`.trim()
-    const email = user?.email ?? 'Brak adresu e-mail'
+    const userName =
+        `${firstName} ${lastName}`.trim()
 
-    const displayedSchoolName = isSchoolLoading
-        ? 'Pobieranie danych...'
-        : schoolName ?? 'Nie przypisano szkoły'
+    const email =
+        user?.email ?? 'Brak adresu e-mail'
+
+    const displayedSchoolName =
+        isSchoolLoading
+            ? 'Pobieranie danych...'
+            : schoolName ??
+            'Nie przypisano szkoły'
 
     const initials =
         `${firstName.charAt(0)}${lastName.charAt(0)}`
@@ -102,254 +109,76 @@ export default function AccountScreen() {
 
     async function handleSignOut() {
         if (isSigningOut) {
-            return;
+            return
         }
 
         try {
-            setIsSigningOut(true);
+            setIsSigningOut(true)
 
-            await signOut();
+            await signOut()
 
-            router.replace('/login');
+            router.replace('/login')
         } catch (error) {
-            console.error('Sign out error:', error);
+            console.error(
+                'Sign out error:',
+                error,
+            )
 
             Alert.alert(
                 'Błąd wylogowania',
                 'Nie udało się wylogować. Spróbuj ponownie.',
-            );
+            )
         } finally {
-            setIsSigningOut(false);
+            setIsSigningOut(false)
         }
     }
 
     return (
-        <View className="flex-1 bg-[#DDEFF6]">
-
+        <View className="flex-1 bg-[#F8FAFC]">
+            <BackgroundDecoration />
 
             <ScrollView
                 className="flex-1"
                 contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: 56,
                     paddingBottom: 140,
                 }}
                 showsVerticalScrollIndicator={false}
             >
-                <View className="px-5 pt-14">
-                    {/* Nagłówek */}
-                    <View className="mb-6 flex-row items-center justify-between">
-                        <View>
-                            <Text className="text-xs font-bold uppercase tracking-[2px] text-[#3478D9]">
-                                Konto ucznia
-                            </Text>
+                <Header />
 
-                            <Text className="mt-2 text-4xl font-extrabold leading-tight text-[#163A59]">
-                                Twój Profil
-                            </Text>
-                        </View>
+                <ProfileCard
+                    initials={initials}
+                    userName={userName}
+                    email={email}
+                    schoolName={
+                        displayedSchoolName
+                    }
+                    isSchoolLoading={
+                        isSchoolLoading
+                    }
+                />
 
+                <AccountSection
+                    userName={userName}
+                    email={email}
+                    schoolName={
+                        displayedSchoolName
+                    }
+                    isSchoolLoading={
+                        isSchoolLoading
+                    }
+                />
 
-                    </View>
-
-                    {/* Hero profilu */}
-                    <View className="mb-6 min-h-[260px] overflow-hidden rounded-[34px] bg-[#163A59] p-6 shadow-lg">
-                        <ProfileWave />
-
-
-
-                        <View className="z-10 flex-1 justify-between">
-                            <View className="flex-row items-start justify-between">
-                                <View className="h-24 w-24 items-center justify-center rounded-[30px] border border-white/20 bg-white/15">
-                                    <Text className="text-4xl font-extrabold text-white">
-                                        {initials}
-                                    </Text>
-                                </View>
-
-                                <View className="flex-row items-center rounded-full bg-[#BFE7CE] px-4 py-2">
-                                    <ShieldCheck
-                                        size={16}
-                                        color="#356B46"
-                                        strokeWidth={2.5}
-                                    />
-
-                                    <Text className="ml-2 text-xs font-bold text-[#356B46]">
-                                        Konto aktywne
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View className="mt-7">
-                                <Text className="text-xs font-bold uppercase tracking-widest text-white/60">
-                                    Witaj na pokładzie
-                                </Text>
-
-                                <Text className="mt-2 text-3xl font-extrabold text-white">
-                                    {userName}
-                                </Text>
-
-                                <View className="mt-3 flex-row items-center">
-                                    <Mail
-                                        size={17}
-                                        color="#B4DCE8"
-                                        strokeWidth={2.2}
-                                    />
-
-                                    <Text
-                                        className="ml-2 flex-1 text-base text-white/75"
-                                        numberOfLines={1}
-                                    >
-                                        {email}
-                                    </Text>
-                                </View>
-                                <View className="ml-4 flex-1 mt-5">
-                                    <Text className="text-xs font-bold uppercase tracking-widest text-white/65">
-                                        Szkoła żeglarska
-                                    </Text>
-
-                                    <Text className="mt-1 text-xl font-extrabold leading-tight text-white">
-                                        {displayedSchoolName}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Dane konta */}
-                    <View className="mb-5 overflow-hidden rounded-[30px] p-5">
-                        <View className="mb-4 flex-row items-center justify-between">
-                            <View>
-                                <Text className="text-xs font-bold uppercase tracking-widest text-[#3478D9]">
-                                    Informacje
-                                </Text>
-
-                                <Text className="mt-1 text-2xl font-extrabold text-[#163A59]">
-                                    Dane konta
-                                </Text>
-                            </View>
-
-
-                        </View>
-
-                        <View className="gap-3">
-                            <AccountDataCard
-                                icon={<User />}
-                                title="Nazwa użytkownika"
-                                value={userName}
-                            />
-
-                            <AccountDataCard
-                                icon={<Mail />}
-                                title="Adres e-mail"
-                                value={email}
-                            />
-
-                            <AccountDataCard
-                                icon={<School />}
-                                title="Szkoła"
-                                value={displayedSchoolName}
-                                isLoading={isSchoolLoading}
-                            />
-
-                            <AccountDataCard
-                                icon={<ShieldCheck />}
-                                title="Status dostępu"
-                                value="Aktywny"
-                                accent="green"
-                            />
-                        </View>
-                    </View>
-
-                    {/* Ustawienia */}
-                    {/*    <View className="mb-5 overflow-hidden rounded-[30px] bg-[#F9E8A2] p-5">
-                        <SmallWave color="#F1D567" />
-
-                        <View className="mb-4 flex-row items-center justify-between">
-                            <View>
-                                <Text className="text-xs font-bold uppercase tracking-widest text-[#8C731D]">
-                                    Personalizacja
-                                </Text>
-
-                                <Text className="mt-1 text-2xl font-extrabold text-[#163A59]">
-                                    Ustawienia
-                                </Text>
-                            </View>
-
-                            <Settings
-                                size={28}
-                                color="#79641C"
-                                strokeWidth={2}
-                            />
-                        </View>
-
-                        <View className="overflow-hidden rounded-[24px] bg-white/50">
-                            <SettingsRow
-                                icon={<Bell />}
-                                title="Powiadomienia"
-                                subtitle="Przypomnienia o nauce"
-                            />
-
-                            <SettingsRow
-                                icon={<Star />}
-                                title="Ulubione pytania"
-                                subtitle="Zapisane materiały"
-                            />
-
-                            <SettingsRow
-                                icon={<Anchor />}
-                                title="Moje patenty"
-                                subtitle="Uprawnienia i certyfikaty"
-                            />
-
-                            <SettingsRow
-                                icon={<Settings />}
-                                title="Ustawienia aplikacji"
-                                subtitle="Wygląd i preferencje"
-                                last
-                            />
-                        </View>
-                    </View>
- */}
-                    {/* Wylogowanie */}
-                    <Pressable
-                        onPress={handleSignOut}
-                        disabled={isSigningOut}
-                        className={`mb-6 flex-row items-center justify-between overflow-hidden rounded-[28px] px-5 py-5 ${isSigningOut
-                            ? 'bg-[#E5B9B9]'
-                            : 'bg-[#F3CACA]'
-                            }`}
-                    >
-                        <View className="flex-row items-center">
-                            <View className="h-12 w-12 items-center justify-center rounded-[18px] bg-white/55">
-                                {isSigningOut ? (
-                                    <ActivityIndicator color="#C84848" />
-                                ) : (
-                                    <LogOut
-                                        size={23}
-                                        color="#C84848"
-                                        strokeWidth={2.4}
-                                    />
-                                )}
-                            </View>
-
-                            <View className="ml-4">
-                                <Text className="text-lg font-extrabold text-[#A83737]">
-                                    {isSigningOut
-                                        ? 'Wylogowywanie...'
-                                        : 'Wyloguj się'}
-                                </Text>
-
-                                <Text className="mt-1 text-sm text-[#A85C5C]">
-                                    Zakończ bieżącą sesję
-                                </Text>
-                            </View>
-                        </View>
-
-                        <ChevronRight
-                            size={23}
-                            color="#C84848"
-                            strokeWidth={2.3}
-                        />
-                    </Pressable>
-                </View>
+                <SignOutCard
+                    isSigningOut={
+                        isSigningOut
+                    }
+                    onPress={
+                        handleSignOut
+                    }
+                />
             </ScrollView>
 
             <BottomNav />
@@ -357,4 +186,287 @@ export default function AccountScreen() {
     )
 }
 
+function Header() {
+    return (
+        <View className="mb-7">
 
+
+            <Text className="mt-2 text-[38px] font-semibold leading-[43px] tracking-[-1.3px] text-[#293681]">
+                Twoje konto
+            </Text>
+
+            <Text className="mt-3 max-w-[340px] text-[16px] leading-6 text-[#747B8F]">
+                Dane profilu, szkoła oraz informacje
+                dotyczące Twojego dostępu.
+            </Text>
+        </View>
+    )
+}
+
+type ProfileCardProps = {
+    initials: string
+    userName: string
+    email: string
+    schoolName: string
+    isSchoolLoading: boolean
+}
+
+function ProfileCard({
+    initials,
+    userName,
+    email,
+    schoolName,
+    isSchoolLoading,
+}: ProfileCardProps) {
+    return (
+        <View className="mb-8 overflow-hidden rounded-[30px] bg-[#293681] p-6">
+            <ProfileDecoration />
+
+            <View className="z-10">
+                <View className="flex-row items-center">
+                    <View className="h-20 w-20 items-center justify-center rounded-[26px] border border-white/15 bg-white/10">
+                        <Text className="text-[30px] font-bold text-white">
+                            {initials}
+                        </Text>
+                    </View>
+
+                    <View className="ml-4 flex-1">
+                        <Text className="text-[11px] font-bold uppercase tracking-[1.4px] text-[#95CCDD]">
+                            Witaj na pokładzie
+                        </Text>
+
+                        <Text
+                            className="mt-1 text-[24px] font-semibold leading-7 text-white"
+                            numberOfLines={2}
+                        >
+                            {userName}
+                        </Text>
+                    </View>
+                </View>
+
+                <View className="mt-6 border-t border-white/10 pt-5">
+                    <View className="flex-row items-center">
+                        <View className="h-9 w-9 items-center justify-center rounded-[13px] bg-white/10">
+                            <Mail
+                                size={17}
+                                color="#95CCDD"
+                                strokeWidth={2.2}
+                            />
+                        </View>
+
+                        <Text
+                            className="ml-3 flex-1 text-sm text-white/75"
+                            numberOfLines={1}
+                        >
+                            {email}
+                        </Text>
+                    </View>
+
+                    <View className="mt-4 flex-row items-center">
+                        <View className="h-9 w-9 items-center justify-center rounded-[13px] bg-white/10">
+                            {isSchoolLoading ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color="#95CCDD"
+                                />
+                            ) : (
+                                <School
+                                    size={18}
+                                    color="#95CCDD"
+                                    strokeWidth={2.2}
+                                />
+                            )}
+                        </View>
+
+                        <View className="ml-3 flex-1">
+                            <Text className="text-[11px] font-semibold uppercase tracking-[1px] text-white/45">
+                                Szkoła
+                            </Text>
+
+                            <Text
+                                className="mt-0.5 text-sm font-semibold text-white"
+                                numberOfLines={1}
+                            >
+                                {schoolName}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+        </View>
+    )
+}
+
+type AccountSectionProps = {
+    userName: string
+    email: string
+    schoolName: string
+    isSchoolLoading: boolean
+}
+
+function AccountSection({
+    userName,
+    email,
+    schoolName,
+    isSchoolLoading,
+}: AccountSectionProps) {
+    return (
+        <View>
+            <View className="mb-5">
+                <Text className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#8B92A5]">
+                    Informacje
+                </Text>
+
+                <Text className="mt-2 text-[27px] font-semibold tracking-[-0.7px] text-[#293681]">
+                    Dane konta
+                </Text>
+
+                <Text className="mt-1 text-sm leading-5 text-[#747B8F]">
+                    Podstawowe informacje o Twoim profilu.
+                </Text>
+            </View>
+
+            <View className="gap-3">
+                <AccountDataCard
+                    icon={
+                        <User
+                            color="#4274D9"
+                            size={21}
+                        />
+                    }
+                    title="Nazwa użytkownika"
+                    value={userName}
+                />
+
+                <AccountDataCard
+                    icon={
+                        <Mail
+                            color="#4274D9"
+                            size={21}
+                        />
+                    }
+                    title="Adres e-mail"
+                    value={email}
+                />
+
+                <AccountDataCard
+                    icon={
+                        <School
+                            color="#4274D9"
+                            size={21}
+                        />
+                    }
+                    title="Szkoła"
+                    value={schoolName}
+                    isLoading={isSchoolLoading}
+                />
+
+                <AccountDataCard
+                    icon={
+                        <ShieldCheck
+                            color="#4274D9"
+                            size={21}
+                        />
+                    }
+                    title="Status dostępu"
+                    value="Aktywny"
+                />
+            </View>
+        </View>
+    )
+}
+
+type SignOutCardProps = {
+    isSigningOut: boolean
+    onPress: () => void
+}
+
+function SignOutCard({
+    isSigningOut,
+    onPress,
+}: SignOutCardProps) {
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={isSigningOut}
+            className="mt-7 flex-row items-center justify-between rounded-[26px] border border-[#F0DADA] bg-white p-5"
+            style={({ pressed }) => ({
+                opacity: isSigningOut
+                    ? 0.65
+                    : pressed
+                        ? 0.85
+                        : 1,
+                transform: [
+                    {
+                        scale:
+                            pressed &&
+                                !isSigningOut
+                                ? 0.988
+                                : 1,
+                    },
+                ],
+            })}
+        >
+            <View className="flex-1 flex-row items-center">
+                <View className="h-12 w-12 items-center justify-center rounded-[17px] bg-[#FFF1F1]">
+                    {isSigningOut ? (
+                        <ActivityIndicator
+                            size="small"
+                            color="#C24F4F"
+                        />
+                    ) : (
+                        <LogOut
+                            size={22}
+                            color="#C24F4F"
+                            strokeWidth={2.3}
+                        />
+                    )}
+                </View>
+
+                <View className="ml-4 flex-1">
+                    <Text className="text-[16px] font-bold text-[#A63F3F]">
+                        {isSigningOut
+                            ? 'Wylogowywanie...'
+                            : 'Wyloguj się'}
+                    </Text>
+
+                    <Text className="mt-1 text-[13px] text-[#9C6D6D]">
+                        Zakończ bieżącą sesję
+                    </Text>
+                </View>
+            </View>
+
+            <ChevronRight
+                size={21}
+                color="#C24F4F"
+                strokeWidth={2.3}
+            />
+        </Pressable>
+    )
+}
+
+function BackgroundDecoration() {
+    return (
+        <View
+            pointerEvents="none"
+            className="absolute inset-0 overflow-hidden"
+        >
+            <View className="absolute -right-36 -top-32 h-80 w-80 rounded-full bg-[#D0E7E6]/45" />
+
+            <View className="absolute -left-40 top-[500px] h-72 w-72 rounded-full bg-[#EEF3FC]" />
+        </View>
+    )
+}
+
+function ProfileDecoration() {
+    return (
+        <View
+            pointerEvents="none"
+            className="absolute inset-0 overflow-hidden"
+        >
+            <View className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#4274D9]/35" />
+
+            <View className="absolute -bottom-20 left-10 h-40 w-40 rounded-full bg-[#95CCDD]/10" />
+        </View>
+    )
+}

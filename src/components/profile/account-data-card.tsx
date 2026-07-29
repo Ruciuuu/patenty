@@ -1,7 +1,6 @@
 import { AccountDataCardProps } from "@/types/account"
-import { View, Text } from "react-native"
-import { ActivityIndicator } from "react-native"
 import React from "react"
+import { ActivityIndicator, Text, View } from "react-native"
 
 
 
@@ -15,7 +14,7 @@ export function AccountDataCard({
     const isGreen = accent === 'green'
 
     return (
-        <View className="flex-row items-center rounded-[22px] bg-white/65 p-4">
+        <View className="flex-row items-center  bg-white/65 p-4">
             <View
                 className={`h-12 w-12 items-center justify-center rounded-[18px] ${isGreen ? 'bg-[#DDF1D4]' : 'bg-[#D9EEF7]'
                     }`}

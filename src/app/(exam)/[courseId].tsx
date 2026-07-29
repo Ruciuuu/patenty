@@ -8,16 +8,17 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    Circle,
     ClipboardCheck,
+    Clock3,
     RotateCcw,
-    Trophy,
-    XCircle,
+    X,
+    XCircle
 } from 'lucide-react-native'
 import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react'
 import {
@@ -30,7 +31,11 @@ import {
     View,
 } from 'react-native'
 
-import { getQuestionImageUrl } from '@/lib/supabase-images'
+import {
+    getSingleParam,
+    shuffleExamQuestions,
+} from '@/domain/exam'
+import { getQuestionImageUrl } from '@/lib/supabase-image'
 import {
     getCourses,
     type Course,
@@ -46,7 +51,6 @@ import {
     type QuestionWithAnswers,
 } from '@/services/questions.service'
 
-
 type ExamMode = 'exam' | 'mistakes'
 
 type SelectedAnswers = Record<string, string>
@@ -56,49 +60,9 @@ type SubmittedResults = Record<
     SubmittedQuestionResult
 >
 
-function getSingleParam(
-    value?: string | string[]
-): string | undefined {
-    return Array.isArray(value)
-        ? value[0]
-        : value
-}
-
-function shuffleItems<T>(items: T[]): T[] {
-    const shuffledItems = [...items]
-
-    for (
-        let index = shuffledItems.length - 1;
-        index > 0;
-        index--
-    ) {
-        const randomIndex = Math.floor(
-            Math.random() * (index + 1)
-        )
-
-        const currentItem = shuffledItems[index]
-
-        shuffledItems[index] =
-            shuffledItems[randomIndex]
-
-        shuffledItems[randomIndex] = currentItem
-    }
-
-    return shuffledItems
-}
-
-function shuffleQuestionAnswers(
-    questions: QuestionWithAnswers[]
-): QuestionWithAnswers[] {
-    return questions.map((question) => ({
-        ...question,
-        question_answers: shuffleItems(
-            question.question_answers
-        ),
-    }))
-}
-
-
+const EXAM_QUESTION_COUNT = 75
+const EXAM_DURATION_SECONDS = 90 * 60
+const EXAM_PASSING_SCORE = 65
 
 export default function ExamScreen() {
     const router = useRouter()
@@ -109,11 +73,11 @@ export default function ExamScreen() {
     }>()
 
     const courseId = getSingleParam(
-        params.courseId
+        params.courseId,
     )
 
     const requestedMode = getSingleParam(
-        params.mode
+        params.mode,
     )
 
     const examMode: ExamMode =
@@ -132,9 +96,8 @@ export default function ExamScreen() {
     const [course, setCourse] =
         useState<Course | null>(null)
 
-    const [questions, setQuestions] = useState<
-        QuestionWithAnswers[]
-    >([])
+    const [questions, setQuestions] =
+        useState<QuestionWithAnswers[]>([])
 
     const [selectedAnswers, setSelectedAnswers] =
         useState<SelectedAnswers>({})
@@ -159,10 +122,16 @@ export default function ExamScreen() {
     const [errorMessage, setErrorMessage] =
         useState<string | null>(null)
 
+    const [timeLeft, setTimeLeft] =
+        useState(EXAM_DURATION_SECONDS)
+
+    const autoSubmitStarted =
+        useRef(false)
+
     const loadExam = useCallback(async () => {
         if (!courseId) {
             setErrorMessage(
-                'Brak identyfikatora kursu.'
+                'Brak identyfikatora kursu.',
             )
             setIsLoading(false)
             return
@@ -175,21 +144,24 @@ export default function ExamScreen() {
             const questionsPromise =
                 isMistakesMode
                     ? getMistakeQuestionsWithAnswers(
-                        courseId
+                        courseId,
                     )
                     : getQuestionsWithAnswers(
-                        courseId
+                        courseId,
                     )
 
-            const [coursesData, questionsData] =
-                await Promise.all([
-                    getCourses(),
-                    questionsPromise,
-                ])
+            const [
+                coursesData,
+                questionsData,
+            ] = await Promise.all([
+                getCourses(),
+                questionsPromise,
+            ])
 
             const selectedCourse =
                 coursesData.find(
-                    (item) => item.id === courseId
+                    (item) =>
+                        item.id === courseId,
                 ) ?? null
 
             if (!selectedCourse) {
@@ -197,7 +169,7 @@ export default function ExamScreen() {
                 setQuestions([])
 
                 setErrorMessage(
-                    'Nie znaleziono wybranego kursu.'
+                    'Nie znaleziono wybranego kursu.',
                 )
 
                 return
@@ -211,28 +183,57 @@ export default function ExamScreen() {
                 setErrorMessage(
                     isMistakesMode
                         ? 'Nie masz obecnie żadnych pytań do powtórki dla tego kursu.'
-                        : 'Dla tego kursu nie dodano jeszcze pytań egzaminacyjnych.'
+                        : 'Dla tego kursu nie dodano jeszcze pytań egzaminacyjnych.',
                 )
 
                 return
             }
 
-            setQuestions(
-                shuffleQuestionAnswers(
-                    questionsData
+            if (
+                !isMistakesMode &&
+                questionsData.length <
+                EXAM_QUESTION_COUNT
+            ) {
+                setQuestions([])
+
+                setErrorMessage(
+                    `Pełny egzamin wymaga ${EXAM_QUESTION_COUNT} pytań. Dostępnych jest obecnie ${questionsData.length}.`,
                 )
-            )
+
+                return
+            }
+
+            const shuffledQuestions =
+                shuffleExamQuestions(
+                    questionsData,
+                )
+
+            const examQuestions =
+                isMistakesMode
+                    ? shuffledQuestions
+                    : shuffledQuestions.slice(
+                        0,
+                        EXAM_QUESTION_COUNT,
+                    )
+
+            setQuestions(examQuestions)
 
             setSelectedAnswers({})
             setSubmittedResults({})
             setCurrentQuestionIndex(0)
             setIsFinished(false)
+            setTimeLeft(
+                EXAM_DURATION_SECONDS,
+            )
+
+            autoSubmitStarted.current =
+                false
         } catch (error) {
             console.error(
                 isMistakesMode
                     ? 'Nie udało się pobrać pytań do powtórki:'
                     : 'Nie udało się pobrać egzaminu:',
-                error
+                error,
             )
 
             setCourse(null)
@@ -243,7 +244,7 @@ export default function ExamScreen() {
             setErrorMessage(
                 isMistakesMode
                     ? 'Nie udało się pobrać pytań do powtórki.'
-                    : 'Nie udało się pobrać egzaminu.'
+                    : 'Nie udało się pobrać egzaminu.',
             )
         } finally {
             setIsLoading(false)
@@ -260,12 +261,17 @@ export default function ExamScreen() {
     const currentQuestion =
         questions[currentQuestionIndex]
 
-    const selectedAnswerId = currentQuestion
-        ? selectedAnswers[currentQuestion.id]
-        : undefined
+    const selectedAnswerId =
+        currentQuestion
+            ? selectedAnswers[
+            currentQuestion.id
+            ]
+            : undefined
 
     const answeredQuestionsCount =
-        Object.keys(selectedAnswers).length
+        Object.keys(
+            selectedAnswers,
+        ).length
 
     const progressPercent =
         questions.length === 0
@@ -273,35 +279,69 @@ export default function ExamScreen() {
             : Math.round(
                 ((currentQuestionIndex + 1) /
                     questions.length) *
-                100
+                100,
             )
 
     const score = useMemo(() => {
         return Object.values(
-            submittedResults
-        ).filter((result) => result.isCorrect)
-            .length
+            submittedResults,
+        ).filter(
+            (result) =>
+                result.isCorrect,
+        ).length
     }, [submittedResults])
 
     const scorePercent =
         questions.length === 0
             ? 0
             : Math.round(
-                (score / questions.length) * 100
+                (score /
+                    questions.length) *
+                100,
             )
+
+    const formattedTime =
+        useMemo(() => {
+            const minutes =
+                Math.floor(
+                    timeLeft / 60,
+                )
+
+            const seconds =
+                timeLeft % 60
+
+            return `${String(
+                minutes,
+            ).padStart(
+                2,
+                '0',
+            )}:${String(
+                seconds,
+            ).padStart(2, '0')}`
+        }, [timeLeft])
+
+    const isTimeLow =
+        !isMistakesMode &&
+        timeLeft <= 5 * 60
 
     function selectAnswer(
         questionId: string,
-        answerId: string
+        answerId: string,
     ) {
-        if (isSubmitting || isFinished) {
+        if (
+            isSubmitting ||
+            isFinished
+        ) {
             return
         }
 
-        setSelectedAnswers((current) => ({
-            ...current,
-            [questionId]: answerId,
-        }))
+        setSelectedAnswers(
+            (current) => ({
+                ...current,
+                [questionId]:
+                    answerId,
+            }),
+        )
     }
 
     function goToPreviousQuestion() {
@@ -309,86 +349,240 @@ export default function ExamScreen() {
             return
         }
 
-        setCurrentQuestionIndex((current) =>
-            Math.max(current - 1, 0)
+        setCurrentQuestionIndex(
+            (current) =>
+                Math.max(
+                    current - 1,
+                    0,
+                ),
         )
     }
 
-    async function finishExam() {
-        if (isSubmitting) {
-            return
-        }
+    const finishExam =
+        useCallback(
+            async (
+                force = false,
+            ) => {
+                if (
+                    isSubmitting ||
+                    isFinished
+                ) {
+                    return
+                }
 
-        const answersToSubmit = questions.map(
-            (question) => ({
-                questionId: question.id,
-                answerId:
-                    selectedAnswers[question.id],
-            })
+                const answeredItems =
+                    questions
+                        .map(
+                            (
+                                question,
+                            ) => ({
+                                questionId:
+                                    question.id,
+                                answerId:
+                                    selectedAnswers[
+                                    question
+                                        .id
+                                    ],
+                            }),
+                        )
+                        .filter(
+                            (
+                                answer,
+                            ): answer is {
+                                questionId: string
+                                answerId: string
+                            } =>
+                                Boolean(
+                                    answer.answerId,
+                                ),
+                        )
+
+                const hasMissingAnswer =
+                    answeredItems.length <
+                    questions.length
+
+                if (
+                    hasMissingAnswer &&
+                    !force
+                ) {
+                    Alert.alert(
+                        isMistakesMode
+                            ? 'Nieukończona powtórka'
+                            : 'Nieukończony egzamin',
+                        `Odpowiedziałeś na ${answeredItems.length} z ${questions.length} pytań.`,
+                        [
+                            {
+                                text: 'Wróć do pytań',
+                                style: 'cancel',
+                            },
+                            {
+                                text: isMistakesMode
+                                    ? 'Zakończ mimo to'
+                                    : 'Oddaj egzamin',
+                                style: 'destructive',
+                                onPress:
+                                    () => {
+                                        void finishExam(
+                                            true,
+                                        )
+                                    },
+                            },
+                        ],
+                    )
+
+                    return
+                }
+
+                try {
+                    setIsSubmitting(
+                        true,
+                    )
+
+                    /*
+                     * Po upływie czasu wysyłamy wyłącznie
+                     * odpowiedzi faktycznie udzielone.
+                     *
+                     * Brakujące pytania nie znajdą się
+                     * w submittedResults, więc nie zwiększą
+                     * wyniku i zostaną potraktowane jako
+                     * niepoprawne przy obliczaniu 65/75.
+                     */
+                    if (
+                        answeredItems.length >
+                        0
+                    ) {
+                        const results =
+                            await submitExamAnswers(
+                                {
+                                    answers:
+                                        answeredItems,
+                                    attemptType,
+                                },
+                            )
+
+                        const resultsByQuestion =
+                            results.reduce<SubmittedResults>(
+                                (
+                                    resultMap,
+                                    result,
+                                ) => {
+                                    resultMap[
+                                        result.questionId
+                                    ] =
+                                        result
+
+                                    return resultMap
+                                },
+                                {},
+                            )
+
+                        setSubmittedResults(
+                            resultsByQuestion,
+                        )
+                    } else {
+                        setSubmittedResults(
+                            {},
+                        )
+                    }
+
+                    setIsFinished(
+                        true,
+                    )
+                } catch (error) {
+                    console.error(
+                        isMistakesMode
+                            ? 'Nie udało się zapisać powtórki:'
+                            : 'Nie udało się zapisać egzaminu:',
+                        error,
+                    )
+
+                    Alert.alert(
+                        'Błąd zapisu',
+                        isMistakesMode
+                            ? 'Nie udało się zapisać wyników powtórki. Spróbuj ponownie.'
+                            : 'Nie udało się zapisać wyników egzaminu. Spróbuj ponownie.',
+                    )
+                } finally {
+                    setIsSubmitting(
+                        false,
+                    )
+                }
+            },
+            [
+                attemptType,
+                isFinished,
+                isMistakesMode,
+                isSubmitting,
+                questions,
+                selectedAnswers,
+            ],
         )
 
-        const hasMissingAnswer =
-            answersToSubmit.some(
-                (answer) => !answer.answerId
-            )
-
-        if (hasMissingAnswer) {
-            Alert.alert(
-                isMistakesMode
-                    ? 'Nieukończona powtórka'
-                    : 'Nieukończony egzamin',
-                'Odpowiedz na wszystkie pytania przed zakończeniem.'
-            )
-
+    useEffect(() => {
+        if (
+            isMistakesMode ||
+            isLoading ||
+            isFinished ||
+            isSubmitting ||
+            questions.length === 0
+        ) {
             return
         }
 
-        try {
-            setIsSubmitting(true)
-
-            const results =
-                await submitExamAnswers({
-                    answers: answersToSubmit,
-                    attemptType,
-                })
-
-            const resultsByQuestion =
-                results.reduce<SubmittedResults>(
-                    (resultMap, result) => {
-                        resultMap[result.questionId] =
-                            result
-
-                        return resultMap
-                    },
-                    {}
+        const timer =
+            setInterval(() => {
+                setTimeLeft(
+                    (current) =>
+                        Math.max(
+                            current -
+                            1,
+                            0,
+                        ),
                 )
+            }, 1000)
 
-            setSubmittedResults(
-                resultsByQuestion
-            )
+        return () =>
+            clearInterval(timer)
+    }, [
+        isMistakesMode,
+        isLoading,
+        isFinished,
+        isSubmitting,
+        questions.length,
+    ])
 
-            setIsFinished(true)
-        } catch (error) {
-            console.error(
-                isMistakesMode
-                    ? 'Nie udało się zapisać powtórki:'
-                    : 'Nie udało się zapisać egzaminu:',
-                error
-            )
-
-            Alert.alert(
-                'Błąd zapisu',
-                isMistakesMode
-                    ? 'Nie udało się zapisać wyników powtórki. Spróbuj ponownie.'
-                    : 'Nie udało się zapisać wyników egzaminu. Spróbuj ponownie.'
-            )
-        } finally {
-            setIsSubmitting(false)
+    useEffect(() => {
+        if (
+            isMistakesMode ||
+            isLoading ||
+            isFinished ||
+            isSubmitting ||
+            questions.length === 0 ||
+            timeLeft > 0 ||
+            autoSubmitStarted.current
+        ) {
+            return
         }
-    }
+
+        autoSubmitStarted.current =
+            true
+
+        void finishExam(true)
+    }, [
+        finishExam,
+        isFinished,
+        isLoading,
+        isMistakesMode,
+        isSubmitting,
+        questions.length,
+        timeLeft,
+    ])
 
     async function goToNextQuestion() {
-        if (!selectedAnswerId || isSubmitting) {
+        if (
+            !selectedAnswerId ||
+            isSubmitting
+        ) {
             return
         }
 
@@ -401,56 +595,36 @@ export default function ExamScreen() {
             return
         }
 
-        setCurrentQuestionIndex((current) =>
-            Math.min(
-                current + 1,
-                questions.length - 1
-            )
+        setCurrentQuestionIndex(
+            (current) =>
+                Math.min(
+                    current + 1,
+                    questions.length -
+                    1,
+                ),
         )
     }
 
     function restartExam() {
-        if (isMistakesMode) {
-            void loadExam()
-            return
-        }
-
-        setQuestions((currentQuestions) =>
-            shuffleQuestionAnswers(
-                currentQuestions
-            )
-        )
-
-        setSelectedAnswers({})
-        setSubmittedResults({})
-        setCurrentQuestionIndex(0)
-        setIsFinished(false)
+        void loadExam()
     }
 
-
     const questionImageUrl =
-        currentQuestion?.image_url && courseId
+        currentQuestion?.image_url &&
+            courseId
             ? getQuestionImageUrl(
                 courseId,
-                currentQuestion.image_url
+                currentQuestion.image_url,
             )
             : undefined
 
-
     if (isLoading) {
         return (
-            <View className="flex-1 items-center justify-center bg-[#F0F7FA] px-6">
-                <ActivityIndicator
-                    size="large"
-                    color="#3478D9"
-                />
-
-                <Text className="mt-4 text-base font-semibold text-[#5A7A95]">
-                    {isMistakesMode
-                        ? 'Pobieranie pytań do powtórki...'
-                        : 'Pobieranie egzaminu...'}
-                </Text>
-            </View>
+            <LoadingState
+                isMistakesMode={
+                    isMistakesMode
+                }
+            />
         )
     }
 
@@ -465,405 +639,203 @@ export default function ExamScreen() {
             questions.length === 0
 
         return (
-            <View className="flex-1 bg-[#F0F7FA] px-6 pt-14">
-                <Pressable
-                    onPress={() => router.back()}
-                    className="h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm"
-                >
-                    <ArrowLeft
-                        size={23}
-                        color="#1A3A52"
-                    />
-                </Pressable>
-
-                <View className="mt-8 rounded-[28px] border border-[#DDEAF0] bg-white p-6 shadow-sm">
-                    <View
-                        className={`h-14 w-14 items-center justify-center rounded-2xl ${noMistakes
-                            ? 'bg-[#E5F4DA]'
-                            : 'bg-[#FFE8E8]'
-                            }`}
-                    >
-                        {noMistakes ? (
-                            <CheckCircle2
-                                size={29}
-                                color="#5D963F"
-                            />
-                        ) : (
-                            <ClipboardCheck
-                                size={29}
-                                color="#C24C4C"
-                            />
-                        )}
-                    </View>
-
-                    <Text className="mt-5 text-2xl font-extrabold text-[#1A3A52]">
-                        {noMistakes
-                            ? 'Wszystko powtórzone'
-                            : isMistakesMode
-                                ? 'Powtórka niedostępna'
-                                : 'Egzamin niedostępny'}
-                    </Text>
-
-                    <Text className="mt-3 text-base leading-relaxed text-[#5A7A95]">
-                        {errorMessage ??
-                            'Nie znaleziono pytań dla tego kursu.'}
-                    </Text>
-
-                    {noMistakes ? (
-                        <Pressable
-                            onPress={() =>
-                                router.back()
-                            }
-                            className="mt-6 flex-row items-center justify-center rounded-2xl bg-[#3478D9] px-4 py-4"
-                        >
-                            <ArrowLeft
-                                size={19}
-                                color="white"
-                            />
-
-                            <Text className="ml-2 font-bold text-white">
-                                Wróć do egzaminów
-                            </Text>
-                        </Pressable>
-                    ) : (
-                        <Pressable
-                            onPress={() =>
-                                void loadExam()
-                            }
-                            className="mt-6 flex-row items-center justify-center rounded-2xl bg-[#3478D9] px-4 py-4"
-                        >
-                            <RotateCcw
-                                size={19}
-                                color="white"
-                            />
-
-                            <Text className="ml-2 font-bold text-white">
-                                Spróbuj ponownie
-                            </Text>
-                        </Pressable>
-                    )}
-                </View>
-            </View>
+            <UnavailableState
+                noMistakes={
+                    Boolean(
+                        noMistakes,
+                    )
+                }
+                isMistakesMode={
+                    isMistakesMode
+                }
+                message={
+                    errorMessage ??
+                    'Nie znaleziono pytań dla tego kursu.'
+                }
+                onBack={() =>
+                    router.back()
+                }
+                onRetry={() =>
+                    void loadExam()
+                }
+            />
         )
     }
 
     if (isFinished) {
         const isPassed =
-            scorePercent >= 75
+            isMistakesMode
+                ? scorePercent >= 75
+                : score >=
+                EXAM_PASSING_SCORE
+
+        const unansweredCount =
+            Math.max(
+                questions.length -
+                answeredQuestionsCount,
+                0,
+            )
+
+        const incorrectCount =
+            questions.length -
+            score
 
         return (
-            <View className="flex-1 bg-[#F0F7FA]">
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{
-                        paddingHorizontal: 24,
-                        paddingTop: 56,
-                        paddingBottom: 60,
-                    }}
-                    showsVerticalScrollIndicator={
-                        false
-                    }
-                >
-                    <Pressable
-                        onPress={() =>
-                            router.back()
-                        }
-                        className="h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm"
-                    >
-                        <ArrowLeft
-                            size={23}
-                            color="#1A3A52"
-                        />
-                    </Pressable>
-
-                    <View className="mt-8 rounded-[30px] border border-[#DDEAF0] bg-white p-6 shadow-sm">
-                        <View
-                            className={`h-16 w-16 items-center justify-center rounded-3xl ${isPassed
-                                ? 'bg-[#E5F4DA]'
-                                : 'bg-[#FFE5E5]'
-                                }`}
-                        >
-                            {isPassed ? (
-                                <Trophy
-                                    size={34}
-                                    color="#5D963F"
-                                />
-                            ) : (
-                                <XCircle
-                                    size={34}
-                                    color="#C24C4C"
-                                />
-                            )}
-                        </View>
-
-                        <Text className="mt-6 text-xs font-bold uppercase tracking-widest text-[#78A4CB]">
-                            {isMistakesMode
-                                ? 'Wynik powtórki'
-                                : 'Wynik egzaminu'}
-                        </Text>
-
-                        <Text className="mt-2 text-5xl font-extrabold text-[#1A3A52]">
-                            {scorePercent}%
-                        </Text>
-
-                        <Text className="mt-3 text-2xl font-extrabold text-[#1A3A52]">
-                            {isMistakesMode
-                                ? isPassed
-                                    ? 'Dobra powtórka'
-                                    : 'Warto powtórzyć ponownie'
-                                : isPassed
-                                    ? 'Egzamin zaliczony'
-                                    : 'Egzamin niezaliczony'}
-                        </Text>
-
-                        <Text className="mt-3 text-base leading-relaxed text-[#5A7A95]">
-                            Poprawne odpowiedzi:{' '}
-                            {score} z{' '}
-                            {questions.length}.
-                        </Text>
-
-                        {isMistakesMode && (
-                            <Text className="mt-3 text-sm leading-relaxed text-[#5A7A95]">
-                                Poprawnie rozwiązane
-                                pytania zostały
-                                przesunięte do kolejnych
-                                powtórek. Błędne mogą
-                                pojawić się ponownie od
-                                razu.
-                            </Text>
-                        )}
-
-                        <Pressable
-                            onPress={
-                                restartExam
-                            }
-                            className="mt-7 flex-row items-center justify-center rounded-2xl bg-[#3478D9] px-4 py-4"
-                        >
-                            <RotateCcw
-                                size={20}
-                                color="white"
-                            />
-
-                            <Text className="ml-2 text-base font-bold text-white">
-                                {isMistakesMode
-                                    ? 'Sprawdź pozostałe błędy'
-                                    : 'Rozwiąż ponownie'}
-                            </Text>
-                        </Pressable>
-                    </View>
-
-                    <Text className="mb-4 mt-8 text-2xl font-extrabold text-[#1A3A52]">
-                        Twoje odpowiedzi
-                    </Text>
-
-                    <View className="gap-4">
-                        {questions.map(
-                            (
-                                question,
-                                questionIndex
-                            ) => {
-                                const chosenAnswerId =
-                                    selectedAnswers[
-                                    question.id
-                                    ]
-
-                                const chosenAnswer =
-                                    question.question_answers.find(
-                                        (answer) =>
-                                            answer.id ===
-                                            chosenAnswerId
-                                    )
-
-                                const result =
-                                    submittedResults[
-                                    question.id
-                                    ]
-
-                                const isCorrect =
-                                    result?.isCorrect ===
-                                    true
-
-                                return (
-                                    <View
-                                        key={
-                                            question.id
-                                        }
-                                        className="rounded-[26px] border border-[#DDEAF0] bg-white p-5 shadow-sm"
-                                    >
-                                        <View className="flex-row items-start">
-                                            <View
-                                                className={`mr-3 h-10 w-10 items-center justify-center rounded-2xl ${isCorrect
-                                                    ? 'bg-[#E5F4DA]'
-                                                    : 'bg-[#FFE5E5]'
-                                                    }`}
-                                            >
-                                                {isCorrect ? (
-                                                    <CheckCircle2
-                                                        size={
-                                                            22
-                                                        }
-                                                        color="#5D963F"
-                                                    />
-                                                ) : (
-                                                    <XCircle
-                                                        size={
-                                                            22
-                                                        }
-                                                        color="#C24C4C"
-                                                    />
-                                                )}
-                                            </View>
-
-                                            <View className="flex-1">
-                                                <Text className="text-xs font-bold uppercase tracking-widest text-[#78A4CB]">
-                                                    Pytanie{' '}
-                                                    {questionIndex +
-                                                        1}
-                                                </Text>
-
-                                                <Text className="mt-2 text-lg font-extrabold leading-6 text-[#1A3A52]">
-                                                    {
-                                                        question.question_text
-                                                    }
-                                                </Text>
-                                            </View>
-                                        </View>
-
-                                        <Text className="mt-4 text-sm font-semibold text-[#5A7A95]">
-                                            Twoja
-                                            odpowiedź
-                                        </Text>
-
-                                        <Text
-                                            className={`mt-1 text-base font-bold ${isCorrect
-                                                ? 'text-[#5D963F]'
-                                                : 'text-[#C24C4C]'
-                                                }`}
-                                        >
-                                            {chosenAnswer?.answer_text ??
-                                                'Brak odpowiedzi'}
-                                        </Text>
-
-                                        <View
-                                            className={`mt-4 rounded-2xl p-4 ${isCorrect
-                                                ? 'bg-[#F0F8EA]'
-                                                : 'bg-[#FFF1F1]'
-                                                }`}
-                                        >
-                                            <Text
-                                                className={`text-sm font-bold ${isCorrect
-                                                    ? 'text-[#5D963F]'
-                                                    : 'text-[#C24C4C]'
-                                                    }`}
-                                            >
-                                                {isCorrect
-                                                    ? 'Odpowiedź poprawna'
-                                                    : 'Odpowiedź błędna'}
-                                            </Text>
-
-                                            {isMistakesMode &&
-                                                result && (
-                                                    <Text className="mt-2 text-sm leading-relaxed text-[#5A7A95]">
-                                                        Seria
-                                                        poprawnych
-                                                        odpowiedzi:{' '}
-                                                        {
-                                                            result.correctStreak
-                                                        }
-                                                        /3
-                                                    </Text>
-                                                )}
-                                        </View>
-
-                                        {question.explanation && (
-                                            <View className="mt-4 rounded-2xl bg-[#F0F7FA] p-4">
-                                                <Text className="text-sm leading-relaxed text-[#5A7A95]">
-                                                    {
-                                                        question.explanation
-                                                    }
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )
-                            }
-                        )}
-                    </View>
-                </ScrollView>
-            </View>
+            <ResultScreen
+                score={score}
+                scorePercent={
+                    scorePercent
+                }
+                questionsCount={
+                    questions.length
+                }
+                incorrectCount={
+                    incorrectCount
+                }
+                unansweredCount={
+                    unansweredCount
+                }
+                isPassed={isPassed}
+                isMistakesMode={
+                    isMistakesMode
+                }
+                questions={
+                    questions
+                }
+                selectedAnswers={
+                    selectedAnswers
+                }
+                submittedResults={
+                    submittedResults
+                }
+                onBack={() =>
+                    router.back()
+                }
+                onRestart={
+                    restartExam
+                }
+            />
         )
     }
 
     return (
-        <View className="flex-1 bg-[#F0F7FA]">
+        <View className="flex-1 bg-[#F8FAFC]">
+            <BackgroundDecoration />
+
             <ScrollView
                 className="flex-1"
                 contentContainerStyle={{
-                    paddingHorizontal: 24,
-                    paddingTop: 56,
-                    paddingBottom: 60,
+                    paddingHorizontal: 20,
+                    paddingTop: 54,
+                    paddingBottom: 40,
                 }}
                 showsVerticalScrollIndicator={
                     false
                 }
             >
                 <View className="flex-row items-center justify-between">
-                    <Pressable
-                        onPress={() =>
-                            router.back()
-                        }
-                        disabled={isSubmitting}
-                        className="h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm"
-                    >
-                        <ArrowLeft
-                            size={23}
-                            color="#1A3A52"
-                        />
-                    </Pressable>
+                    <View className="flex-row items-center">
+                        <Pressable
+                            onPress={() =>
+                                router.back()
+                            }
+                            disabled={
+                                isSubmitting
+                            }
+                            className="h-11 w-11 items-center justify-center rounded-[16px] border border-[#E4E9F2] bg-white"
+                        >
+                            <ArrowLeft
+                                size={20}
+                                color="#293681"
+                                strokeWidth={
+                                    2.4
+                                }
+                            />
+                        </Pressable>
 
-                    <View className="rounded-full bg-white px-4 py-2 shadow-sm">
-                        <Text className="text-sm font-bold text-[#3478D9]">
-                            {answeredQuestionsCount}/
-                            {questions.length}
-                        </Text>
+                        <View className="ml-3">
+                            <Text className="text-[11px] font-bold uppercase tracking-[1.3px] text-[#8B92A5]">
+                                {isMistakesMode
+                                    ? 'Powtórka'
+                                    : 'Egzamin próbny'}
+                            </Text>
+
+                            <Text
+                                className="mt-0.5 max-w-[180px] text-sm font-semibold text-[#293681]"
+                                numberOfLines={
+                                    1
+                                }
+                            >
+                                {
+                                    course.name
+                                }
+                            </Text>
+                        </View>
                     </View>
+
+                    {!isMistakesMode ? (
+                        <View
+                            className={`flex-row items-center rounded-full px-3.5 py-2.5 ${isTimeLow
+                                ? 'bg-[#FFF0F0]'
+                                : 'bg-[#EEF3FC]'
+                                }`}
+                        >
+                            <Clock3
+                                size={16}
+                                color={
+                                    isTimeLow
+                                        ? '#C65353'
+                                        : '#4274D9'
+                                }
+                                strokeWidth={
+                                    2.3
+                                }
+                            />
+
+                            <Text
+                                className={`ml-2 text-[14px] font-bold tabular-nums ${isTimeLow
+                                    ? 'text-[#B24444]'
+                                    : 'text-[#293681]'
+                                    }`}
+                            >
+                                {
+                                    formattedTime
+                                }
+                            </Text>
+                        </View>
+                    ) : null}
                 </View>
 
-                <Text className="mt-7 text-xs font-bold uppercase tracking-widest text-[#78A4CB]">
-                    {isMistakesMode
-                        ? 'Powtórka błędów'
-                        : 'Egzamin próbny'}
-                </Text>
-
-                <Text className="mt-2 text-3xl font-extrabold leading-tight text-[#1A3A52]">
-                    {course.name}
-                </Text>
-
-                {isMistakesMode && (
-                    <Text className="mt-3 text-base leading-relaxed text-[#5A7A95]">
-                        Rozwiąż ponownie pytania, przy
-                        których wcześniej popełniłeś
+                {isMistakesMode ? (
+                    <Text className="mt-5 text-sm leading-6 text-[#747B8F]">
+                        Rozwiąż ponownie
+                        pytania, przy których
+                        wcześniej popełniłeś
                         błąd.
                     </Text>
-                )}
+                ) : null}
 
-                <View className="mt-6">
-                    <View className="mb-2 flex-row items-center justify-between">
-                        <Text className="text-sm font-semibold text-[#5A7A95]">
+                <View className="mt-7">
+                    <View className="mb-2.5 flex-row items-center justify-between">
+                        <Text className="text-[13px] font-semibold text-[#747B8F]">
                             Pytanie{' '}
                             {currentQuestionIndex +
                                 1}{' '}
-                            z {questions.length}
+                            z{' '}
+                            {
+                                questions.length
+                            }
                         </Text>
 
-                        <Text className="text-sm font-extrabold text-[#3478D9]">
-                            {progressPercent}%
+                        <Text className="text-[13px] font-bold text-[#4274D9]">
+                            {answeredQuestionsCount}{' '}
+                            odpowiedzi
                         </Text>
                     </View>
 
-                    <View className="h-3 overflow-hidden rounded-full bg-[#DCE9EF]">
+                    <View className="h-2 overflow-hidden rounded-full bg-[#E5EAF2]">
                         <View
-                            className="h-full rounded-full bg-[#3478D9]"
+                            className="h-full rounded-full bg-[#4274D9]"
                             style={{
                                 width: `${progressPercent}%`,
                             }}
@@ -871,43 +843,40 @@ export default function ExamScreen() {
                     </View>
                 </View>
 
-                <View className="mt-8 rounded-[30px] border border-[#DDEAF0] bg-white p-6 shadow-sm">
-                    <View className="mb-5 h-14 w-14 items-center justify-center rounded-2xl bg-[#D9EEF7]">
-                        <ClipboardCheck
-                            size={29}
-                            color="#3478D9"
-                        />
-                    </View>
-
-                    <Text className="text-2xl font-extrabold leading-8 text-[#1A3A52]">
+                <View className="mt-7">
+                    <Text className="text-[25px] font-semibold leading-[33px] tracking-[-0.5px] text-[#293681]">
                         {
                             currentQuestion.question_text
                         }
                     </Text>
 
-                    {questionImageUrl && (
-                        <Image
-                            source={{
-                                uri: questionImageUrl,
-                            }}
-                            className="mt-6 h-52 w-full rounded-2xl bg-[#EAF2F5]"
-                            resizeMode="contain"
-                        />
-                    )}
+                    {questionImageUrl ? (
+                        <View className="mt-6 overflow-hidden rounded-[24px] border border-[#E4E9F2] bg-white">
+                            <Image
+                                source={{
+                                    uri: questionImageUrl,
+                                }}
+                                className="h-[230px] w-full"
+                                resizeMode="contain"
+                            />
+                        </View>
+                    ) : null}
 
-                    <Text className="mt-7 text-sm font-bold uppercase tracking-widest text-[#78A4CB]">
-                        Wybierz odpowiedź
-                    </Text>
-
-                    <View className="mt-4 gap-3">
+                    <View className="mt-7 gap-3">
                         {currentQuestion.question_answers.map(
                             (
                                 answer,
-                                answerIndex
+                                answerIndex,
                             ) => {
                                 const isSelected =
                                     answer.id ===
                                     selectedAnswerId
+
+                                const answerLetter =
+                                    String.fromCharCode(
+                                        65 +
+                                        answerIndex,
+                                    )
 
                                 return (
                                     <Pressable
@@ -920,73 +889,65 @@ export default function ExamScreen() {
                                         onPress={() =>
                                             selectAnswer(
                                                 currentQuestion.id,
-                                                answer.id
+                                                answer.id,
                                             )
                                         }
-                                        className={`flex-row items-start rounded-2xl border p-4 ${isSelected
-                                            ? 'border-[#3478D9] bg-[#EAF5F9]'
-                                            : 'border-[#DDEAF0] bg-white'
+                                        className={`flex-row items-center rounded-[20px] border px-4 py-4 ${isSelected
+                                            ? 'border-[#4274D9] bg-[#EEF3FC]'
+                                            : 'border-[#E2E7EF] bg-white'
                                             }`}
+                                        style={({
+                                            pressed,
+                                        }) => ({
+                                            opacity:
+                                                pressed
+                                                    ? 0.9
+                                                    : 1,
+                                        })}
                                     >
                                         <View
-                                            className={`mr-3 h-9 w-9 items-center justify-center rounded-full ${isSelected
-                                                ? 'bg-[#3478D9]'
-                                                : 'bg-[#F0F7FA]'
+                                            className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected
+                                                ? 'bg-[#4274D9]'
+                                                : 'bg-[#F4F6FA]'
                                                 }`}
                                         >
                                             {isSelected ? (
                                                 <Check
                                                     size={
-                                                        19
+                                                        18
                                                     }
-                                                    color="white"
+                                                    color="#FFFFFF"
                                                     strokeWidth={
-                                                        3
+                                                        2.8
                                                     }
                                                 />
                                             ) : (
-                                                <Circle
-                                                    size={
-                                                        19
+                                                <Text className="text-sm font-bold text-[#7D8599]">
+                                                    {
+                                                        answerLetter
                                                     }
-                                                    color="#8DA7B8"
-                                                />
+                                                </Text>
                                             )}
                                         </View>
 
-                                        <View className="flex-1">
-                                            <Text
-                                                className={`text-xs font-bold uppercase tracking-widest ${isSelected
-                                                    ? 'text-[#3478D9]'
-                                                    : 'text-[#8DA7B8]'
-                                                    }`}
-                                            >
-                                                Odpowiedź{' '}
-                                                {String.fromCharCode(
-                                                    65 +
-                                                    answerIndex
-                                                )}
-                                            </Text>
-
-                                            <Text
-                                                className={`mt-1 text-base font-semibold leading-6 ${isSelected
-                                                    ? 'text-[#1A3A52]'
-                                                    : 'text-[#5A7A95]'
-                                                    }`}
-                                            >
-                                                {
-                                                    answer.answer_text
-                                                }
-                                            </Text>
-                                        </View>
+                                        <Text
+                                            className={`ml-4 flex-1 text-[15px] font-semibold leading-6 ${isSelected
+                                                ? 'text-[#293681]'
+                                                : 'text-[#515B71]'
+                                                }`}
+                                        >
+                                            {
+                                                answer.answer_text
+                                            }
+                                        </Text>
                                     </Pressable>
                                 )
-                            }
+                            },
                         )}
                     </View>
                 </View>
 
-                <View className="mt-6 flex-row gap-3">
+                <View className="mt-8 flex-row gap-3">
                     <Pressable
                         onPress={
                             goToPreviousQuestion
@@ -996,30 +957,30 @@ export default function ExamScreen() {
                             0 ||
                             isSubmitting
                         }
-                        className={`h-14 flex-1 flex-row items-center justify-center rounded-2xl border ${currentQuestionIndex ===
+                        className={`h-14 flex-1 flex-row items-center justify-center rounded-[18px] border ${currentQuestionIndex ===
                             0 ||
                             isSubmitting
-                            ? 'border-[#DCE6EB] bg-[#E8F0F3]'
-                            : 'border-[#C9DDE6] bg-white'
+                            ? 'border-[#E8EBF0] bg-[#F5F7FA]'
+                            : 'border-[#DCE2EC] bg-white'
                             }`}
                     >
                         <ChevronLeft
-                            size={21}
+                            size={20}
                             color={
                                 currentQuestionIndex ===
                                     0 ||
                                     isSubmitting
-                                    ? '#AABBC5'
-                                    : '#3478D9'
+                                    ? '#B5BBC7'
+                                    : '#293681'
                             }
                         />
 
                         <Text
-                            className={`ml-1 font-bold ${currentQuestionIndex ===
+                            className={`ml-1 text-sm font-bold ${currentQuestionIndex ===
                                 0 ||
                                 isSubmitting
-                                ? 'text-[#AABBC5]'
-                                : 'text-[#3478D9]'
+                                ? 'text-[#B5BBC7]'
+                                : 'text-[#293681]'
                                 }`}
                         >
                             Wstecz
@@ -1034,44 +995,490 @@ export default function ExamScreen() {
                             !selectedAnswerId ||
                             isSubmitting
                         }
-                        className={`h-14 flex-[1.5] flex-row items-center justify-center rounded-2xl ${selectedAnswerId &&
+                        className={`h-14 flex-[1.65] flex-row items-center justify-center rounded-[18px] ${selectedAnswerId &&
                             !isSubmitting
-                            ? 'bg-[#3478D9]'
-                            : 'bg-[#AFC5D4]'
+                            ? 'bg-[#293681]'
+                            : 'bg-[#C7CDDA]'
                             }`}
                     >
                         {isSubmitting ? (
                             <>
                                 <ActivityIndicator
                                     size="small"
-                                    color="white"
+                                    color="#FFFFFF"
                                 />
 
-                                <Text className="ml-2 font-bold text-white">
+                                <Text className="ml-2 text-sm font-bold text-white">
                                     Zapisywanie...
                                 </Text>
                             </>
                         ) : (
                             <>
-                                <Text className="font-bold text-white">
+                                <Text className="mr-1 text-sm font-bold text-white">
                                     {currentQuestionIndex ===
                                         questions.length -
                                         1
                                         ? isMistakesMode
-                                            ? 'Zakończ powtórkę'
-                                            : 'Zakończ egzamin'
-                                        : 'Następne pytanie'}
+                                            ? 'Zakończ'
+                                            : 'Oddaj egzamin'
+                                        : 'Dalej'}
                                 </Text>
 
                                 <ChevronRight
-                                    size={21}
-                                    color="white"
+                                    size={20}
+                                    color="#FFFFFF"
                                 />
                             </>
                         )}
                     </Pressable>
                 </View>
             </ScrollView>
+        </View>
+    )
+}
+
+type ResultScreenProps = {
+    score: number
+    scorePercent: number
+    questionsCount: number
+    incorrectCount: number
+    unansweredCount: number
+    isPassed: boolean
+    isMistakesMode: boolean
+    questions: QuestionWithAnswers[]
+    selectedAnswers: SelectedAnswers
+    submittedResults: SubmittedResults
+    onBack: () => void
+    onRestart: () => void
+}
+
+function ResultScreen({
+    score,
+    scorePercent,
+    questionsCount,
+    incorrectCount,
+    unansweredCount,
+    isPassed,
+    isMistakesMode,
+    questions,
+    selectedAnswers,
+    submittedResults,
+    onBack,
+    onRestart,
+}: ResultScreenProps) {
+    return (
+        <View className="flex-1 bg-[#F8FAFC]">
+            <BackgroundDecoration />
+
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: 54,
+                    paddingBottom: 60,
+                }}
+                showsVerticalScrollIndicator={
+                    false
+                }
+            >
+                <Pressable
+                    onPress={onBack}
+                    className="h-11 w-11 items-center justify-center rounded-[16px] border border-[#E4E9F2] bg-white"
+                >
+                    <ArrowLeft
+                        size={20}
+                        color="#293681"
+                    />
+                </Pressable>
+
+                <View className="mt-8 overflow-hidden rounded-[30px] bg-[#293681] p-6">
+                    <View className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#4274D9]/35" />
+
+                    <View className="absolute -bottom-20 left-10 h-40 w-40 rounded-full bg-[#95CCDD]/10" />
+
+                    <View className="z-10">
+                        <View className="flex-row items-start justify-between">
+                            <View className="flex-1 pr-4">
+                                <Text className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#95CCDD]">
+                                    {isMistakesMode
+                                        ? 'Wynik powtórki'
+                                        : 'Wynik egzaminu'}
+                                </Text>
+
+                                <View className="mt-3 flex-row items-end">
+                                    <Text className="text-[52px] font-semibold leading-[58px] tracking-[-2px] text-white">
+                                        {score}
+                                    </Text>
+
+                                    <Text className="mb-2 ml-1 text-[20px] font-semibold text-white/50">
+                                        /
+                                        {
+                                            questionsCount
+                                        }
+                                    </Text>
+                                </View>
+                            </View>
+
+
+                        </View>
+
+                        <Text className="mt-4 text-[24px] font-semibold text-white">
+                            {isMistakesMode
+                                ? isPassed
+                                    ? 'Dobra powtórka'
+                                    : 'Warto spróbować ponownie'
+                                : isPassed
+                                    ? 'Egzamin zdany'
+                                    : 'Egzamin niezdany'}
+                        </Text>
+
+                        <Text className="mt-2 text-sm leading-6 text-white/65">
+                            {isMistakesMode
+                                ? `Poprawnie odpowiedziałeś na ${score} z ${questionsCount} pytań.`
+                                : isPassed
+                                    ? 'Osiągnąłeś wynik wymagany do zaliczenia egzaminu.'
+                                    : `Do zaliczenia potrzebujesz minimum ${EXAM_PASSING_SCORE} poprawnych odpowiedzi.`}
+                        </Text>
+                    </View>
+                </View>
+
+                <View className="mt-5 rounded-[26px] border border-[#E3E8F1] bg-white p-5">
+                    <ResultRow
+                        label="Poprawne odpowiedzi"
+                        value={`${score}`}
+                    />
+
+                    <ResultDivider />
+
+                    <ResultRow
+                        label="Błędne lub pominięte"
+                        value={`${incorrectCount}`}
+                    />
+
+                    {unansweredCount >
+                        0 ? (
+                        <>
+                            <ResultDivider />
+
+                            <ResultRow
+                                label="Bez odpowiedzi"
+                                value={`${unansweredCount}`}
+                            />
+                        </>
+                    ) : null}
+
+                    <ResultDivider />
+
+                    <ResultRow
+                        label="Wynik"
+                        value={`${scorePercent}%`}
+                    />
+
+                    {!isMistakesMode ? (
+                        <>
+                            <ResultDivider />
+
+                            <ResultRow
+                                label="Próg zaliczenia"
+                                value={`${EXAM_PASSING_SCORE} / ${EXAM_QUESTION_COUNT}`}
+                                accent
+                            />
+                        </>
+                    ) : null}
+                </View>
+
+                <Pressable
+                    onPress={onRestart}
+                    className="mt-5 flex-row items-center justify-center rounded-[18px] bg-[#293681] px-5 py-4"
+                >
+                    <RotateCcw
+                        size={19}
+                        color="#FFFFFF"
+                    />
+
+                    <Text className="ml-2 text-[15px] font-bold text-white">
+                        {isMistakesMode
+                            ? 'Powtórz ponownie'
+                            : 'Nowy egzamin'}
+                    </Text>
+                </Pressable>
+
+                <Text className="mb-4 mt-10 text-[27px] font-semibold tracking-[-0.7px] text-[#293681]">
+                    Twoje odpowiedzi
+                </Text>
+
+                <View className="gap-4">
+                    {questions.map(
+                        (
+                            question,
+                            questionIndex,
+                        ) => {
+                            const chosenAnswerId =
+                                selectedAnswers[
+                                question.id
+                                ]
+
+                            const chosenAnswer =
+                                question.question_answers.find(
+                                    (
+                                        answer,
+                                    ) =>
+                                        answer.id ===
+                                        chosenAnswerId,
+                                )
+
+                            const result =
+                                submittedResults[
+                                question.id
+                                ]
+
+                            const isCorrect =
+                                result?.isCorrect ===
+                                true
+
+                            const wasAnswered =
+                                Boolean(
+                                    chosenAnswerId,
+                                )
+
+                            return (
+                                <View
+                                    key={
+                                        question.id
+                                    }
+                                    className="rounded-[24px] border border-[#E3E8F1] bg-white p-5"
+                                >
+                                    <View className="flex-row items-start">
+                                        <View
+                                            className={`h-10 w-10 items-center justify-center rounded-[14px] ${isCorrect
+                                                ? 'bg-[#EEF7F7]'
+                                                : 'bg-[#FFF1F1]'
+                                                }`}
+                                        >
+                                            {isCorrect ? (
+                                                <CheckCircle2
+                                                    size={
+                                                        21
+                                                    }
+                                                    color="#4274D9"
+                                                />
+                                            ) : (
+                                                <XCircle
+                                                    size={
+                                                        21
+                                                    }
+                                                    color="#C65353"
+                                                />
+                                            )}
+                                        </View>
+
+                                        <View className="ml-3 flex-1">
+                                            <Text className="text-[11px] font-bold uppercase tracking-[1.2px] text-[#9299AB]">
+                                                Pytanie{' '}
+                                                {questionIndex +
+                                                    1}
+                                            </Text>
+
+                                            <Text className="mt-1.5 text-[16px] font-semibold leading-6 text-[#293681]">
+                                                {
+                                                    question.question_text
+                                                }
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View className="mt-4 rounded-[17px] bg-[#F6F8FB] p-4">
+                                        <Text className="text-[11px] font-bold uppercase tracking-[1px] text-[#9299AB]">
+                                            Twoja
+                                            odpowiedź
+                                        </Text>
+
+                                        <Text
+                                            className={`mt-1.5 text-sm font-semibold leading-5 ${isCorrect
+                                                ? 'text-[#293681]'
+                                                : 'text-[#B94C4C]'
+                                                }`}
+                                        >
+                                            {wasAnswered
+                                                ? chosenAnswer?.answer_text ??
+                                                'Brak odpowiedzi'
+                                                : 'Brak odpowiedzi'}
+                                        </Text>
+                                    </View>
+
+                                    {question.explanation ? (
+                                        <View className="mt-3 rounded-[17px] bg-[#EEF3FC] p-4">
+                                            <Text className="text-sm leading-6 text-[#687087]">
+                                                {
+                                                    question.explanation
+                                                }
+                                            </Text>
+                                        </View>
+                                    ) : null}
+                                </View>
+                            )
+                        },
+                    )}
+                </View>
+            </ScrollView>
+        </View>
+    )
+}
+
+function ResultRow({
+    label,
+    value,
+    accent = false,
+}: {
+    label: string
+    value: string
+    accent?: boolean
+}) {
+    return (
+        <View className="flex-row items-center justify-between">
+            <Text className="text-sm text-[#747B8F]">
+                {label}
+            </Text>
+
+            <Text
+                className={`text-sm font-bold ${accent
+                    ? 'text-[#4274D9]'
+                    : 'text-[#293681]'
+                    }`}
+            >
+                {value}
+            </Text>
+        </View>
+    )
+}
+
+function ResultDivider() {
+    return (
+        <View className="my-4 h-px bg-[#EDF0F5]" />
+    )
+}
+
+function LoadingState({
+    isMistakesMode,
+}: {
+    isMistakesMode: boolean
+}) {
+    return (
+        <View className="flex-1 items-center justify-center bg-[#F8FAFC] px-6">
+            <View className="h-16 w-16 items-center justify-center rounded-[22px] border border-[#E3E8F1] bg-white">
+                <ActivityIndicator
+                    size="large"
+                    color="#4274D9"
+                />
+            </View>
+
+            <Text className="mt-5 text-[17px] font-semibold text-[#293681]">
+                {isMistakesMode
+                    ? 'Pobieranie powtórki...'
+                    : 'Przygotowujemy egzamin...'}
+            </Text>
+
+            <Text className="mt-2 text-center text-sm text-[#747B8F]">
+                {isMistakesMode
+                    ? 'Ładujemy pytania, które wymagają ponownej odpowiedzi.'
+                    : 'Losujemy 75 pytań z dostępnej bazy.'}
+            </Text>
+        </View>
+    )
+}
+
+function UnavailableState({
+    noMistakes,
+    isMistakesMode,
+    message,
+    onBack,
+    onRetry,
+}: {
+    noMistakes: boolean
+    isMistakesMode: boolean
+    message: string
+    onBack: () => void
+    onRetry: () => void
+}) {
+    return (
+        <View className="flex-1 bg-[#F8FAFC] px-6 pt-14">
+            <Pressable
+                onPress={onBack}
+                className="h-11 w-11 items-center justify-center rounded-[16px] border border-[#E3E8F1] bg-white"
+            >
+                <X
+                    size={20}
+                    color="#293681"
+                />
+            </Pressable>
+
+            <View className="mt-8 rounded-[28px] border border-[#E3E8F1] bg-white p-6">
+                <View className="h-14 w-14 items-center justify-center rounded-[18px] bg-[#EEF3FC]">
+                    {noMistakes ? (
+                        <CheckCircle2
+                            size={27}
+                            color="#4274D9"
+                        />
+                    ) : (
+                        <ClipboardCheck
+                            size={27}
+                            color="#4274D9"
+                        />
+                    )}
+                </View>
+
+                <Text className="mt-5 text-[23px] font-semibold text-[#293681]">
+                    {noMistakes
+                        ? 'Wszystko powtórzone'
+                        : isMistakesMode
+                            ? 'Powtórka niedostępna'
+                            : 'Egzamin niedostępny'}
+                </Text>
+
+                <Text className="mt-2 text-sm leading-6 text-[#747B8F]">
+                    {message}
+                </Text>
+
+                <Pressable
+                    onPress={
+                        noMistakes
+                            ? onBack
+                            : onRetry
+                    }
+                    className="mt-6 flex-row items-center justify-center rounded-[18px] bg-[#293681] px-4 py-4"
+                >
+                    {noMistakes ? (
+                        <ArrowLeft
+                            size={18}
+                            color="#FFFFFF"
+                        />
+                    ) : (
+                        <RotateCcw
+                            size={18}
+                            color="#FFFFFF"
+                        />
+                    )}
+
+                    <Text className="ml-2 font-bold text-white">
+                        {noMistakes
+                            ? 'Wróć do egzaminów'
+                            : 'Spróbuj ponownie'}
+                    </Text>
+                </Pressable>
+            </View>
+        </View>
+    )
+}
+
+function BackgroundDecoration() {
+    return (
+        <View
+            pointerEvents="none"
+            className="absolute inset-0 overflow-hidden"
+        >
+            <View className="absolute -right-36 -top-32 h-80 w-80 rounded-full bg-[#D0E7E6]/40" />
+
+            <View className="absolute -left-40 top-[620px] h-72 w-72 rounded-full bg-[#EEF3FC]" />
         </View>
     )
 }
