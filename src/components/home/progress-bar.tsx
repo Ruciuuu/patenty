@@ -1,88 +1,31 @@
-export function ProgressRing({
+import { ProgressBarProps } from "@/types/home"
+import { View } from "react-native"
+
+export function ProgressBar({
     value,
-    size,
-    dark = false,
-}: ProgressRingProps) {
-    const strokeWidth = 5
-    const radius =
-        (size - strokeWidth) / 2
-
-    const circumference =
-        2 * Math.PI * radius
-
+    trackColor,
+    fillColor,
+    className = '',
+}: ProgressBarProps) {
     const normalizedValue = Math.min(
         100,
         Math.max(0, value),
     )
 
-    const strokeDashoffset =
-        circumference -
-        (normalizedValue / 100) *
-        circumference
-
     return (
         <View
-            className="items-center justify-center rounded-full"
+            className={`h-2 overflow-hidden rounded-full ${className}`}
             style={{
-                width: size,
-                height: size,
-                backgroundColor: dark
-                    ? 'rgba(255,255,255,0.08)'
-                    : '#FFFFFF',
+                backgroundColor: trackColor,
             }}
         >
-            <Svg
-                width={size}
-                height={size}
+            <View
+                className="h-full rounded-full"
                 style={{
-                    position: 'absolute',
-                    transform: [
-                        {
-                            rotate: '-90deg',
-                        },
-                    ],
+                    width: `${normalizedValue}%`,
+                    backgroundColor: fillColor,
                 }}
-            >
-                <Circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke={
-                        dark
-                            ? 'rgba(255,255,255,0.15)'
-                            : '#E5EAF3'
-                    }
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
-                />
-
-                <Circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    r={radius}
-                    stroke={
-                        dark
-                            ? '#95CCDD'
-                            : '#4274D9'
-                    }
-                    strokeWidth={strokeWidth}
-                    strokeLinecap="round"
-                    strokeDasharray={`${circumference} ${circumference}`}
-                    strokeDashoffset={
-                        strokeDashoffset
-                    }
-                    fill="transparent"
-                />
-            </Svg>
-
-            <Text
-                className={`text-xs font-bold ${dark
-                    ? 'text-white'
-                    : 'text-[#293681]'
-                    }`}
-            >
-                {normalizedValue}%
-            </Text>
+            />
         </View>
     )
 }

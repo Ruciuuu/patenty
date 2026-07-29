@@ -1,7 +1,9 @@
 import { ContinueLearningCardProps } from "@/types/home"
 import { Image } from "expo-image"
-import { Text, View } from "react-native"
-import { PrimaryButton } from "../primary-button"
+import { RotateCcw } from "lucide-react-native"
+import { ActivityIndicator, Text, View } from "react-native"
+import { PrimaryButton } from "./primary-button"
+import { ProgressBar } from "./progress-bar"
 
 
 const COLORS = {
@@ -42,21 +44,24 @@ export function ContinueLearningCard({
 
 
 
+
     return (
         <View className="mb-9 overflow-hidden rounded-[30px] border border-[#E4E9F2] bg-white shadow-sm">
             <View className="relative h-[190px] overflow-hidden">
-                {thumbnailUrl ?
+                {thumbnailUrl === "" ?
+
+                    (
+                        <View className="absolute h-full w-full bg-[#EEF3FC]" />
+
+                    )
+                    :
                     (<Image
                         source={{
                             uri: thumbnailUrl
                         }}
                         className="absolute h-full w-full"
-                        resizeMode="cover"
-                    />) :
-                    (
-                        <View className="absolute h-full w-full bg-[#EEF3FC]" />
-
-                    )
+                        contentFit="cover"
+                    />)
 
 
                 }

@@ -1,12 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router'
 import {
-    ArrowUpRight,
-    BookOpen,
-    Check,
-    ChevronRight,
-    ClipboardCheck,
-    Play,
-    RotateCcw
+    Check
 } from 'lucide-react-native'
 import {
     useCallback,
@@ -16,23 +10,18 @@ import {
     useState,
 } from 'react'
 import {
-    ActivityIndicator,
     Animated,
-    Image,
-    Pressable,
     ScrollView,
     Text,
-    View,
+    View
 } from 'react-native'
-import Svg, {
-    Circle,
-    Defs,
-    LinearGradient,
-    Path,
-    Stop,
-} from 'react-native-svg'
 
 import { BottomNav } from '@/components/app/bottom-nav'
+import { ChooseCourseCard } from '@/components/home/choose-course-card'
+import { ContinueLearningCard } from '@/components/home/continue-learning-card'
+import { CourseModeCard } from '@/components/home/course-mode-card'
+import { ExamModeCard } from '@/components/home/exam-mode-card'
+import { ProgressSummaryCard } from '@/components/home/progress-summary-card'
 import { useAuth } from '@/context/auth-context'
 import { getThumbnail } from '@/lib/supabase-image'
 import {
@@ -44,6 +33,7 @@ import {
     type CourseWithLessons
 } from '@/services/courses.service'
 import { getCompletedLessonIds } from '@/services/progress.service'
+import { HeaderProps, SectionHeaderProps } from '@/types/home'
 
 const COLORS = {
     background: '#F8FAFC',
@@ -69,6 +59,9 @@ export default function HomeScreen() {
     const router = useRouter()
     const { user } = useAuth()
 
+
+    /* useStates */
+
     const [course, setCourse] =
         useState<CourseWithLessons | null>(null)
 
@@ -87,7 +80,7 @@ export default function HomeScreen() {
     const [favoriteCourseId, setFavoriteCourseId] =
         useState<string | null>(null)
 
-    const [courseThumbnailUrl, setCourseThumbnailUrl] = useState<string | null>(null)
+    const [courseThumbnailUrl, setCourseThumbnailUrl] = useState<string>("")
 
     const [isSettingFavoriteCourse, setIsSettingFavoriteCourse] =
         useState(false)
@@ -101,6 +94,8 @@ export default function HomeScreen() {
     const entryTranslateY = useRef(
         new Animated.Value(18),
     ).current
+
+
 
     const userName =
         user?.user_metadata?.first_name?.trim() ||
@@ -162,7 +157,7 @@ export default function HomeScreen() {
                 return
             }
 
-            const imageUrl = selectedCourse ? selectedCourse.image_url : null;
+            const imageUrl = selectedCourse ? selectedCourse.image_url : "";
             setCourseThumbnailUrl(imageUrl)
 
 
@@ -365,7 +360,7 @@ export default function HomeScreen() {
                         {isLoadingCourse ? (
                             <ContinueLearningCard
                                 isLoading
-                                thumbnailUrl={null}
+                                thumbnailUrl={""}
                                 error={courseError}
                                 courseName="Kurs"
                                 progressPercent={0}
@@ -376,7 +371,7 @@ export default function HomeScreen() {
                                 disabled
                                 onPress={() => { }}
                             />
-                        ) : favoriteCourseId === null && courseThumbnailUrl === null ? (
+                        ) : favoriteCourseId === null && courseThumbnailUrl === "" ? (
                             <ChooseCourseCard
                                 courses={availableCourses}
                                 error={courseError}
@@ -477,9 +472,14 @@ export default function HomeScreen() {
     )
 }
 
-type HeaderProps = {
-    firstName: string
-}
+
+
+
+
+
+/* HEADERS */
+
+
 
 function Header({
     firstName,
@@ -500,99 +500,6 @@ function Header({
 
 
 
-
-
-
-
-
-
-
-type PrimaryButtonProps = {
-    label: string
-    disabled: boolean
-    completed: boolean
-    onPress: () => void
-}
-
-function PrimaryButton({
-    label,
-    disabled,
-    completed,
-    onPress,
-}: PrimaryButtonProps) {
-    return (
-        <Pressable
-            onPress={onPress}
-            disabled={disabled}
-            className={`mt-5 flex-row items-center justify-between rounded-[18px] px-5 py-4 ${disabled
-                ? 'bg-[#E9ECF4]'
-                : 'bg-[#293681]'
-                }`}
-            style={({ pressed }) => ({
-                opacity: disabled ? 0.7 : 1,
-                transform: [
-                    {
-                        scale:
-                            pressed && !disabled
-                                ? 0.985
-                                : 1,
-                    },
-                ],
-            })}
-        >
-            <View className="flex-row items-center">
-                {completed ? (
-                    <RotateCcw
-                        size={18}
-                        color={
-                            disabled
-                                ? '#9298A9'
-                                : '#FFFFFF'
-                        }
-                    />
-                ) : (
-                    <Play
-                        size={18}
-                        color={
-                            disabled
-                                ? '#9298A9'
-                                : '#FFFFFF'
-                        }
-                        fill={
-                            disabled
-                                ? '#9298A9'
-                                : '#FFFFFF'
-                        }
-                    />
-                )}
-
-                <Text
-                    className={`ml-3 text-[15px] font-bold ${disabled
-                        ? 'text-[#9298A9]'
-                        : 'text-white'
-                        }`}
-                >
-                    {label}
-                </Text>
-            </View>
-
-            <ChevronRight
-                size={20}
-                color={
-                    disabled
-                        ? '#9298A9'
-                        : '#FFFFFF'
-                }
-            />
-        </Pressable>
-    )
-}
-
-type SectionHeaderProps = {
-    title: string
-    description: string
-}
-
 function SectionHeader({
     title,
     description,
@@ -610,211 +517,9 @@ function SectionHeader({
     )
 }
 
-type CourseModeCardProps = {
-    progressPercent: number
-    completedLessons: number
-    totalLessons: number
-    isLoading: boolean
-    onPress: () => void
-}
-
-function CourseModeCard({
-    progressPercent,
-    completedLessons,
-    totalLessons,
-    isLoading,
-    onPress,
-}: CourseModeCardProps) {
-    return (
-        <Pressable
-            onPress={onPress}
-            disabled={isLoading}
-            className="min-h-[246px] overflow-hidden rounded-[28px] border border-[#E4E9F2] bg-white p-5"
-            style={({ pressed }) => ({
-                opacity: isLoading ? 0.65 : 1,
-                transform: [
-                    {
-                        scale:
-                            pressed && !isLoading
-                                ? 0.98
-                                : 1,
-                    },
-                ],
-            })}
-        >
-            <View className="absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-[#D0E7E6]/60" />
-
-            <View className="z-10 flex-1 justify-between">
-                <View className="flex-row items-start justify-between">
-                    <View className="h-12 w-12 items-center justify-center rounded-[17px] bg-[#EDF3FC]">
-                        <BookOpen
-                            size={23}
-                            color="#4274D9"
-                            strokeWidth={2.1}
-                        />
-                    </View>
-
-                    <ArrowUpRight
-                        size={20}
-                        color="#8991A6"
-                    />
-                </View>
-
-                <View className="mt-7">
-                    <Text className="text-[23px] font-semibold leading-7 tracking-[-0.5px] text-[#293681]">
-                        Kurs
-                    </Text>
-
-                    <Text className="mt-2 text-[13px] leading-[19px] text-[#747B8F]">
-                        Krótkie lekcje i najważniejsze
-                        zagadnienia.
-                    </Text>
-                </View>
-
-                <View className="mt-5">
-                    <ProgressBar
-                        value={progressPercent}
-                        trackColor="#E9EDF5"
-                        fillColor="#4274D9"
-                    />
-
-                    <Text className="mt-3 text-xs font-semibold text-[#687087]">
-                        {completedLessons}/
-                        {totalLessons} lekcji
-                    </Text>
-                </View>
-            </View>
-        </Pressable>
-    )
-}
-
-function ExamModeCard({
-    onPress,
-}: {
-    onPress: () => void
-}) {
-    return (
-        <Pressable
-            onPress={onPress}
-            className="min-h-[246px] overflow-hidden rounded-[28px] border border-[#DCE5F4] bg-[#F3F6FC] p-5"
-            style={({ pressed }) => ({
-                transform: [
-                    {
-                        scale: pressed
-                            ? 0.98
-                            : 1,
-                    },
-                ],
-            })}
-        >
-            <ExamCardDecoration />
-
-            <View className="z-10 flex-1 justify-between">
-                <View className="flex-row items-start justify-between">
-                    <View className="h-12 w-12 items-center justify-center rounded-[17px] bg-white">
-                        <ClipboardCheck
-                            size={24}
-                            color="#293681"
-                            strokeWidth={2.1}
-                        />
-                    </View>
+/* CARDS */
 
 
-                </View>
-
-                <View className="mt-7">
-                    <Text className="text-[23px] font-semibold leading-7 tracking-[-0.5px] text-[#293681]">
-                        Egzaminy
-                    </Text>
-
-                    <Text className="mt-2 text-[13px] leading-[19px] text-[#687087]">
-                        Sprawdź gotowość na pełnym
-                        zestawie pytań.
-                    </Text>
-                </View>
-
-                <View className="mt-5 flex-row items-center justify-between">
-                    <Text className="text-xs font-bold text-[#4274D9]">
-                        Rozpocznij
-                    </Text>
-
-                    <View className="h-9 w-9 items-center justify-center rounded-full bg-[#293681]">
-                        <ChevronRight
-                            size={18}
-                            color="#FFFFFF"
-                        />
-                    </View>
-                </View>
-            </View>
-        </Pressable>
-    )
-}
-
-type ProgressSummaryCardProps = {
-    progressPercent: number
-    completedLessons: number
-    totalLessons: number
-    isCompleted: boolean
-    onPress: () => void
-}
-
-function ProgressSummaryCard({
-    progressPercent,
-    completedLessons,
-    totalLessons,
-    isCompleted,
-    onPress,
-}: ProgressSummaryCardProps) {
-    return (
-        <Pressable
-            onPress={onPress}
-            className="mt-4 overflow-hidden rounded-[30px] bg-[#293681] p-5"
-            style={({ pressed }) => ({
-                transform: [
-                    {
-                        scale: pressed
-                            ? 0.988
-                            : 1,
-                    },
-                ],
-            })}
-        >
-            <DarkCardDecoration />
-
-            <View className="z-10 flex-row items-center">
-                <View className="mr-4">
-                    <ProgressRing
-                        value={progressPercent}
-                        size={72}
-                        dark
-                    />
-                </View>
-
-                <View className="flex-1">
-                    <Text className="text-[11px] font-bold uppercase tracking-[1.2px] text-[#95CCDD]">
-                        Twój postęp
-                    </Text>
-
-                    <Text className="mt-2 text-[19px] font-semibold leading-6 text-white">
-                        {isCompleted
-                            ? 'Kurs ukończony'
-                            : totalLessons > 0
-                                ? `${completedLessons} z ${totalLessons} lekcji za Tobą`
-                                : 'Pierwsza lekcja czeka'}
-                    </Text>
-
-                    <Text className="mt-1 text-[13px] leading-[18px] text-white/65">
-                        {isCompleted
-                            ? 'Możesz wrócić do dowolnego tematu.'
-                            : 'Regularność jest ważniejsza niż długie sesje.'}
-                    </Text>
-                </View>
-
-
-            </View>
-        </Pressable>
-    )
-}
 
 function DailyTipCard() {
     return (
@@ -847,49 +552,6 @@ function DailyTipCard() {
     )
 }
 
-type ProgressBarProps = {
-    value: number
-    trackColor: string
-    fillColor: string
-    className?: string
-}
-
-function ProgressBar({
-    value,
-    trackColor,
-    fillColor,
-    className = '',
-}: ProgressBarProps) {
-    const normalizedValue = Math.min(
-        100,
-        Math.max(0, value),
-    )
-
-    return (
-        <View
-            className={`h-2 overflow-hidden rounded-full ${className}`}
-            style={{
-                backgroundColor: trackColor,
-            }}
-        >
-            <View
-                className="h-full rounded-full"
-                style={{
-                    width: `${normalizedValue}%`,
-                    backgroundColor: fillColor,
-                }}
-            />
-        </View>
-    )
-}
-
-type ProgressRingProps = {
-    value: number
-    size: number
-    dark?: boolean
-}
-
-
 
 function BackgroundDecoration() {
     return (
@@ -904,82 +566,4 @@ function BackgroundDecoration() {
     )
 }
 
-function ExamCardDecoration() {
-    return (
-        <View
-            pointerEvents="none"
-            className="absolute bottom-0 left-0 right-0 h-28 opacity-40"
-        >
-            <Svg
-                width="100%"
-                height="100%"
-                viewBox="0 0 200 120"
-                preserveAspectRatio="none"
-            >
-                <Path
-                    d="M-20 104 C24 42 60 126 104 72 C137 31 170 86 220 31"
-                    fill="none"
-                    stroke="#95CCDD"
-                    strokeWidth="2"
-                />
 
-                <Path
-                    d="M-12 116 C35 58 67 136 112 86 C151 45 177 100 220 57"
-                    fill="none"
-                    stroke="#95CCDD"
-                    strokeWidth="2"
-                />
-
-                <Path
-                    d="M-25 88 C17 31 55 108 99 54 C140 8 171 68 220 16"
-                    fill="none"
-                    stroke="#95CCDD"
-                    strokeWidth="2"
-                />
-            </Svg>
-        </View>
-    )
-}
-
-function DarkCardDecoration() {
-    return (
-        <View
-            pointerEvents="none"
-            className="absolute inset-0"
-        >
-            <Svg
-                width="100%"
-                height="100%"
-                viewBox="0 0 400 160"
-                preserveAspectRatio="none"
-            >
-                <Defs>
-                    <LinearGradient
-                        id="darkGlow"
-                        x1="0"
-                        y1="0"
-                        x2="1"
-                        y2="1"
-                    >
-                        <Stop
-                            offset="0"
-                            stopColor="#4274D9"
-                            stopOpacity="0.45"
-                        />
-
-                        <Stop
-                            offset="1"
-                            stopColor="#293681"
-                            stopOpacity="0"
-                        />
-                    </LinearGradient>
-                </Defs>
-
-                <Path
-                    d="M190 -20 C260 34 298 22 430 110 L430 -20 Z"
-                    fill="url(#darkGlow)"
-                />
-            </Svg>
-        </View>
-    )
-}
